@@ -30,12 +30,10 @@ import org.apache.lucene.util.hnsw.Neighbor;
 import org.apache.lucene.util.hnsw.Neighbors;
 
 /**
- * {@code KnnExactDeletionFilter} applies in-set (i.e. the query vector is exactly in the index)
- * deletion strategy to filter all unmatched results searched by {@link KnnExactDeletionCondition},
- * and deletes at most ef*segmentCnt vectors that are the same to the specified queryVector.
+ * In-set deletion, delete at most ef*segCnt vectors that are same to the queryVector.
  */
-public class KnnExactDeletionFilter extends KnnScoreWeight {
-  KnnExactDeletionFilter(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int ef) {
+public class KnnDelScoreWeight extends KnnScoreWeight {
+  KnnDelScoreWeight(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int ef) {
     super(query, score, scoreMode, field, queryVector, ef);
   }
 
