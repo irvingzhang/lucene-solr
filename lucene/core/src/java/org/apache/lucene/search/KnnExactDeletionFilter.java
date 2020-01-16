@@ -19,7 +19,6 @@ package org.apache.lucene.search;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.apache.lucene.index.FieldInfo;
@@ -30,10 +29,12 @@ import org.apache.lucene.util.hnsw.Neighbor;
 import org.apache.lucene.util.hnsw.Neighbors;
 
 /**
- * In-set deletion, delete at most ef*segCnt vectors that are same to the queryVector.
+ * {@code KnnExactDeletionFilter} applies in-set (i.e. the query vector is exactly in the index)
+ * deletion strategy to filter all unmatched results searched by {@link KnnExactDeletionCondition},
+ * and deletes at most ef*segmentCnt vectors that are the same to the specified queryVector.
  */
-public class KnnDelScoreWeight extends KnnScoreWeight {
-  KnnDelScoreWeight(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int ef) {
+public class KnnExactDeletionFilter extends KnnScoreWeight {
+  KnnExactDeletionFilter(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int ef) {
     super(query, score, scoreMode, field, queryVector, ef);
   }
 
@@ -76,7 +77,7 @@ public class KnnDelScoreWeight extends KnnScoreWeight {
 
             neighbors.clear();
 
-            toDeleteNeighbors.forEach(neighbor -> neighbors.add(neighbor));
+            toDeleteNeighbors.forEach(neighbors::add);
           }
         }
 
@@ -95,12 +96,12 @@ public class KnnDelScoreWeight extends KnnScoreWeight {
               }
 
               @Override
-              public int nextDoc() throws IOException {
+              public int nextDoc() {
                 return advance(offset);
               }
 
               @Override
-              public int advance(int target) throws IOException {
+              public int advance(int target) {
                 if (target > size || neighbors.size() == 0) {
                   doc = NO_MORE_DOCS;
                 } else {
@@ -127,12 +128,12 @@ public class KnnDelScoreWeight extends KnnScoreWeight {
           }
 
           @Override
-          public float getMaxScore(int upTo) throws IOException {
+          public float getMaxScore(int upTo) {
             return Float.POSITIVE_INFINITY;
           }
 
           @Override
-          public float score() throws IOException {
+          public float score() {
             return 0.0f;
           }
 
