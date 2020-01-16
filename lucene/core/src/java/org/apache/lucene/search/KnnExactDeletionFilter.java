@@ -19,6 +19,7 @@ package org.apache.lucene.search;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.lucene.index.FieldInfo;
@@ -77,7 +78,7 @@ public class KnnExactDeletionFilter extends KnnScoreWeight {
 
             neighbors.clear();
 
-            toDeleteNeighbors.forEach(neighbors::add);
+            toDeleteNeighbors.forEach(neighbor -> neighbors.add(neighbor));
           }
         }
 
@@ -96,12 +97,12 @@ public class KnnExactDeletionFilter extends KnnScoreWeight {
               }
 
               @Override
-              public int nextDoc() {
+              public int nextDoc() throws IOException {
                 return advance(offset);
               }
 
               @Override
-              public int advance(int target) {
+              public int advance(int target) throws IOException {
                 if (target > size || neighbors.size() == 0) {
                   doc = NO_MORE_DOCS;
                 } else {
@@ -128,12 +129,12 @@ public class KnnExactDeletionFilter extends KnnScoreWeight {
           }
 
           @Override
-          public float getMaxScore(int upTo) {
+          public float getMaxScore(int upTo) throws IOException {
             return Float.POSITIVE_INFINITY;
           }
 
           @Override
-          public float score() {
+          public float score() throws IOException {
             return 0.0f;
           }
 
