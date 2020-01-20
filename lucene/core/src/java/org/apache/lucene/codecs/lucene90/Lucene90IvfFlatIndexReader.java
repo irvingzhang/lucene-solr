@@ -32,7 +32,6 @@ import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.store.ChecksumIndexInput;
 import org.apache.lucene.store.IndexInput;
-import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.IntsRef;
 import org.apache.lucene.util.RamUsageEstimator;
@@ -40,7 +39,7 @@ import org.apache.lucene.util.RamUsageEstimator;
 public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
   private final FieldInfos fieldInfos;
 
-  private final IndexInput vectorData, ivfFlatData;
+  private final IndexInput vectorData;
 
   private final int maxDoc;
 
@@ -60,9 +59,6 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
 
     this.vectorData = openAndCheckFile(state, versionMeta, Lucene90KnnGraphFormat.VECTOR_DATA_EXTENSION,
         Lucene90KnnGraphFormat.VECTOR_DATA_CODEC_NAME);
-
-    this.ivfFlatData = openAndCheckFile(state, versionMeta, Lucene90IvfFlatIndexFormat.IVF_FLAT_DATA_EXTENSION,
-        Lucene90IvfFlatIndexFormat.IVF_FLAT_DATA_CODEC_NAME);
   }
 
   /**
@@ -77,9 +73,6 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
   public void checkIntegrity() throws IOException {
     if (vectorData != null) {
       CodecUtil.checksumEntireFile(vectorData);
-    }
-    if (ivfFlatData != null) {
-      CodecUtil.checksumEntireFile(ivfFlatData);
     }
   }
 
@@ -111,16 +104,13 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
    * @param field the field name for retrieval
    */
   @Override
-  public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+  public IvfFlatValues getIvfFlatValues(String field) {
     final IvfFlatEntry ivfFlatEntry = ivfFlats.get(field);
     if (ivfFlatEntry == null) {
       return IvfFlatValues.EMPTY;
     }
 
-    final IndexInput bytesSlice = ivfFlatData.slice("ivf-flat-data", ivfFlatEntry.ivfFlatDataOffset,
-        ivfFlatEntry.ivfFlatLength);
-
-    return new IndexedIvfFlatReader(maxDoc, ivfFlatEntry, bytesSlice);
+    return new IndexedIvfFlatReader(maxDoc, ivfFlatEntry);
   }
 
   /**
@@ -138,7 +128,7 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
    */
   @Override
   public void close() throws IOException {
-    IOUtils.close(this.vectorData, this.ivfFlatData);
+    IOUtils.close(this.vectorData);
   }
 
   /**
@@ -207,29 +197,25 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
 
       long vectorDataOffset = meta.readVLong();
       long vectorDataLength = meta.readVLong();
-      long ivfDataOffset = meta.readVLong();
-      long ivfDataLength = meta.readVLong();
       int clustersSize = meta.readInt();
 
-      final int[] centroids = new int[clustersSize];
-      for (int i = 0; i < centroids.length; ++i) {
-        centroids[i] = meta.readVInt();
+      final Map<Integer, IntsRef> clusters = new HashMap<>(clustersSize);
+      final Map<Integer, Integer> docToOrd = new HashMap<>();
+      for (int i = 0; i < clustersSize; ++i) {
+        int cluster = meta.readVInt();
+        int numClusterPoints = meta.readInt();
+        int[] clusterPoints = new int[numClusterPoints];
+        clusterPoints[0] = meta.readVInt();
+        docToOrd.put(clusterPoints[0], meta.readVInt());
+        for (int num = 1; num < numClusterPoints; ++num) {
+          clusterPoints[num] = meta.readVInt() + clusterPoints[num - 1];
+          docToOrd.put(clusterPoints[num], meta.readVInt());
+        }
+
+        clusters.put(cluster, new IntsRef(clusterPoints, 0, clusterPoints.length));
       }
 
-      int offsetCnt = meta.readInt();
-      final Map<Integer, Long> docToOffsets = new HashMap<>(offsetCnt);
-      for (int i = 0; i < offsetCnt; ++i) {
-        docToOffsets.put(meta.readVInt(), meta.readVLong());
-      }
-
-      int vecOffsetCnt = meta.readInt();
-      final Map<Integer, Integer> docToOrd = new HashMap<>(vecOffsetCnt);
-      for (int i = 0; i < vecOffsetCnt; ++i) {
-        docToOrd.put(meta.readVInt(), meta.readVInt());
-      }
-
-      IvfFlatEntry ivfFlatEntry = new IvfFlatEntry(vectorDataOffset, vectorDataLength, docToOrd, ivfDataOffset,
-          ivfDataLength, centroids, docToOffsets);
+      IvfFlatEntry ivfFlatEntry = new IvfFlatEntry(vectorDataOffset, vectorDataLength, docToOrd, clusters);
 
       ramBytesUsed += RamUsageEstimator.shallowSizeOfInstance(IvfFlatEntry.class);
       ramBytesUsed += RamUsageEstimator.shallowSizeOf(ivfFlatEntry.docToVectorOrd);
@@ -239,18 +225,14 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
   }
 
   private static final class IvfFlatEntry extends Lucene90KnnGraphReader.VectorDataEntry {
-    final long ivfFlatDataOffset;
-    final long ivfFlatLength;
     final int[] centroids;
-    final Map<Integer, Long> docToCentroidOffset;
+    final Map<Integer, IntsRef> docToCentroidOffset;
 
 
     public IvfFlatEntry(long vectorDataOffset, long vectorDataLength, Map<Integer, Integer> docToVectorOrd,
-                        long ivfFlatDataOffset, long ivfFlatLength, int[] centroids, Map<Integer, Long> docToCentroidOffset) {
+                        Map<Integer, IntsRef> docToCentroidOffset) {
       super(vectorDataOffset, vectorDataLength, docToVectorOrd);
-      this.ivfFlatDataOffset = ivfFlatDataOffset;
-      this.ivfFlatLength = ivfFlatLength;
-      this.centroids = centroids;
+      this.centroids = docToCentroidOffset.keySet().stream().mapToInt(i -> i).toArray();
       this.docToCentroidOffset = docToCentroidOffset;
     }
   }
@@ -261,16 +243,11 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
 
     final IvfFlatEntry ivfFlatEntry;
 
-    final IndexInput dataIn;
-
     int doc = -1;
 
-    InvertLinkRef invertLinkRef;
-
-    private IndexedIvfFlatReader(long maxDoc, IvfFlatEntry ivfFlatEntry, IndexInput dataIn) {
+    private IndexedIvfFlatReader(long maxDoc, IvfFlatEntry ivfFlatEntry) {
       this.maxDoc = maxDoc;
       this.ivfFlatEntry = ivfFlatEntry;
-      this.dataIn = dataIn;
     }
 
     /**
@@ -298,8 +275,8 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
         throw new IllegalArgumentException("centroid must be >= 0 or <= maxDocID (=" + maxDoc + ")");
       }
 
-      int[] ivfLink = invertLinkRef.invertLink;
-      return new IntsRef(ivfLink, 0, ivfLink.length);
+
+      return ivfFlatEntry.docToCentroidOffset.getOrDefault(centroid, new IntsRef());
     }
 
     /**
@@ -311,7 +288,7 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
      * @param target the target doc ID that advanced to
      */
     @Override
-    public boolean advanceExact(int target) throws IOException {
+    public boolean advanceExact(int target) {
       advance(target);
       return doc == target;
     }
@@ -344,7 +321,7 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
      * @since 2.9
      */
     @Override
-    public int nextDoc() throws IOException {
+    public int nextDoc() {
       return advance(doc + 1);
     }
 
@@ -381,26 +358,22 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
      * @since 2.9
      */
     @Override
-    public int advance(int target) throws IOException {
-      // enabled random access.
+    public int advance(int target) {
       if (target >= maxDoc) {
         return doc = NO_MORE_DOCS;
       }
 
       doc = target - 1;
-      Long offset;
-      boolean found;
       do {
-        offset = ivfFlatEntry.docToCentroidOffset.get(++doc);
-        found = offset != null;
-      } while (!found && doc < maxDoc);
+        if (ivfFlatEntry.docToCentroidOffset.containsKey(++doc)) {
+          break;
+        }
+      } while (doc < maxDoc);
 
-      if (!found || doc == maxDoc) {
+      if (doc == maxDoc) {
         return doc = NO_MORE_DOCS;
       }
 
-      dataIn.seek(offset);
-      this.invertLinkRef = readIvfFlatIndex();
       return doc;
     }
 
@@ -414,51 +387,6 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
     @Override
     public long cost() {
       return maxDoc;
-    }
-
-    private InvertLinkRef readIvfFlatIndex() throws IOException {
-      InvertLinkRef invertLinkRef = new InvertLinkRef();
-      int invertLinkLength = dataIn.readInt();
-      assert invertLinkLength >= 0;
-      if (invertLinkLength == 0) {
-        return invertLinkRef;
-      }
-
-      int[] invertLink = new int[invertLinkLength];
-      invertLink[0] = dataIn.readVInt(); /// first and smallest id;
-      for (int i = 1; i < invertLinkLength; ++i) {
-        int delta = dataIn.readVInt();
-        assert delta > 0;
-        invertLink[i] = invertLink[i - 1] + delta;
-      }
-
-      invertLinkRef.setInvertLink(invertLink);
-
-      return invertLinkRef;
-    }
-
-    static final class InvertLinkRef implements Accountable {
-      int[] invertLink;
-
-      long ramBytesUsed;
-
-      InvertLinkRef() {
-        invertLink = IntsRef.EMPTY_INTS;
-        this.ramBytesUsed = RamUsageEstimator.shallowSizeOfInstance(getClass());
-      }
-
-      void setInvertLink(int[] invertLink) {
-        this.invertLink = invertLink;
-        this.ramBytesUsed += RamUsageEstimator.sizeOf(invertLink);
-      }
-
-      /**
-       * Return the memory usage of this object in bytes. Negative values are illegal.
-       */
-      @Override
-      public long ramBytesUsed() {
-        return this.ramBytesUsed;
-      }
     }
   }
 }

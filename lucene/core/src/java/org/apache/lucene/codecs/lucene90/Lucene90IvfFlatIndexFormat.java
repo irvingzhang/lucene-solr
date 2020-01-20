@@ -28,11 +28,7 @@ import org.apache.lucene.index.SegmentWriteState;
 public class Lucene90IvfFlatIndexFormat extends IvfFlatIndexFormat {
   static final String META_CODEC_NAME = "Lucene90IvfFlatIndexFormatMeta";
 
-  static final String IVF_FLAT_DATA_CODEC_NAME = "Lucene90IvfFlatIndexFormatData";
-
   static final String META_EXTENSION = "ifi";
-
-  static final String IVF_FLAT_DATA_EXTENSION = "ifd";
 
   static final int VERSION_START = 0;
 
