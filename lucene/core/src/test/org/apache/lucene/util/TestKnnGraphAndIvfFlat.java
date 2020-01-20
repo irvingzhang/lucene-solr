@@ -14,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.lucene.util.ivfflat;
+package org.apache.lucene.util;
 
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -31,141 +32,104 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IvfFlatValues;
+import org.apache.lucene.index.KnnGraphValues;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.KnnGraphQuery;
 import org.apache.lucene.search.KnnIvfFlatQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.util.IntsRef;
-import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.NamedThreadFactory;
+import org.junit.Before;
 
-/** Tests indexing of a ivf-flat */
-public class TestKnnIvfFlat extends LuceneTestCase {
+import static org.apache.lucene.util.hnsw.HNSWGraphWriter.RAND_SEED;
 
-  private static final String KNN_IVF_FLAT_FIELD = "vector";
+/** A simple performance comparison for IVFFlat and HNSW */
+public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
 
-  /**
-   * Basic test of creating documents in a graph
-   */
-  public void testBasic() throws Exception {
-    try (Directory dir = newDirectory(); IndexWriter iw = new IndexWriter(
-        dir, newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
-      int numDoc = atLeast(20);
-      int dimension = atLeast(10);
-      float[][] values = new float[numDoc][];
-      for (int i = 0; i < numDoc; i++) {
-        if (random().nextBoolean()) {
-          values[i] = new float[dimension];
-          for (int j = 0; j < dimension; j++) {
-            values[i][j] = random().nextFloat();
-          }
-        }
-        add(iw, i, values[i]);
-      }
+  private static final String KNN_VECTOR_FIELD = "vector";
 
-      assertConsistentIvfFlat(iw, values);
-    }
+  @Before
+  public void setup() {
+    RAND_SEED = random().nextLong();
   }
 
-  public void testSingleDocumentRecall() throws Exception {
-    try (Directory dir = newDirectory(); IndexWriter iw = new IndexWriter(dir,
-        newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
-      float[][] values = new float[][]{new float[]{0, 1, 2}};
-      add(iw, 0, values[0]);
-      assertConsistentIvfFlat(iw, values);
-      iw.commit();
-      assertConsistentIvfFlat(iw, values);
+  public void testComparison() throws Exception {
+    int numDoc = 10000, dimension = 100;
 
-      assertRecall(dir, 1, 1, values[0], true);
-    }
-  }
-
-  public void testSearch() throws Exception {
-    int numDoc = 10000;
-    int dimension = 100;
     float[][] randomVectors = randomVectors(numDoc, dimension);
 
+    System.out.println("start running for IVFFlat ...");
+    RunCase(numDoc, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT);
+
+    System.out.println("start running for HNSW...");
+    RunCase(numDoc, dimension, randomVectors, VectorValues.VectorIndexType.HNSW);
+  }
+
+  private void RunCase(int numDoc, int dimension, float[][] randomVectors, VectorValues.VectorIndexType type) throws Exception {
     try (Directory dir = newDirectory(); IndexWriter iw = new IndexWriter(
         dir, newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
       for (int i = 0; i < numDoc; ++i) {
-        add(iw, i, randomVectors[i]);
+        add(iw, i, randomVectors[i], type);
       }
 
       iw.commit();
-      assertConsistentIvfFlat(iw, randomVectors);
+      assertConsistent(iw, randomVectors, type);
 
       long totalCostTime = 0;
       int totalRecallCnt = 0;
       QueryResult result;
-      int testRecall = 1000;
+      int testRecall = Math.min(numDoc, 1000);
       for (int i = 0; i < testRecall; ++i) {
-        result = assertRecall(dir, 1, 1, randomVectors[i], false);
+        result = assertRecall(dir, 1, 1, randomVectors[i], false, type);
         totalCostTime += result.costTime;
         totalRecallCnt += result.recallCnt;
       }
 
-      System.out.println("Total number of docs -> " + numDoc + ", dimension -> " + dimension +
-          ", recall experiments -> " + testRecall + ", exact recall times -> " + totalRecallCnt +
-          ", total search time -> " + totalCostTime + "msec, avg search time -> " +
-          1.0F * totalCostTime / testRecall + "msec, recall percent -> " +
-          100.0F * totalRecallCnt / testRecall + "%");
+      System.out.println("[***" + type.toString() + "***] Total number of docs -> " + numDoc +
+          ", dimension -> " + dimension + ", recall experiments -> " + testRecall +
+          ", exact recall times -> " + totalRecallCnt + ", total search time -> " +
+          totalCostTime + "msec, avg search time -> " + 1.0F * totalCostTime / testRecall +
+          "msec, recall percent -> " + 100.0F * totalRecallCnt / testRecall + "%");
     }
   }
 
-  private void assertConsistentIvfFlat(IndexWriter iw, float[][] values) throws IOException {
-    int totalIvfFlatDocs = 0;
+  private void assertConsistent(IndexWriter iw, float[][] values, VectorValues.VectorIndexType type) throws IOException {
     try (DirectoryReader dr = DirectoryReader.open(iw)) {
+      KnnGraphValues graphValues;
+      IvfFlatValues ivfFlatValues;
       for (LeafReaderContext ctx: dr.leaves()) {
         LeafReader reader = ctx.reader();
-        VectorValues vectorValues = reader.getVectorValues(KNN_IVF_FLAT_FIELD);
-        IvfFlatValues ivfFlatValues = reader.getIvfFlatValues(KNN_IVF_FLAT_FIELD);
-        assertTrue((vectorValues == null) == (ivfFlatValues == null));
+        VectorValues vectorValues = reader.getVectorValues(KNN_VECTOR_FIELD);
+        if (type == VectorValues.VectorIndexType.HNSW) {
+          graphValues = reader.getKnnGraphValues(KNN_VECTOR_FIELD);
+          assertEquals((vectorValues == null), (graphValues == null));
+        } else if (type == VectorValues.VectorIndexType.IVFFLAT) {
+          ivfFlatValues = reader.getIvfFlatValues(KNN_VECTOR_FIELD);
+          assertEquals((vectorValues == null), (ivfFlatValues == null));
+        }
         if (vectorValues == null) {
           continue;
         }
 
-        boolean hasVector = false;
         for (int i = 0; i < reader.maxDoc(); i++) {
-          int id = Integer.parseInt(reader.document(i).get("id"));
+          int id = Integer.parseInt(Objects.requireNonNull(reader.document(i).get("id")));
           if (values[id] == null) {
-            ++totalIvfFlatDocs;
             // documents without IvfFlatValues have no vectors or neighbors
             assertNotEquals("document " + id + " was not expected to have values", i, vectorValues.advance(i));
-            /// assertNotEquals(i, ivfFlatValues.advance(i));
-          } else {
-            hasVector = true;
-            // documents with KnnGraphValues have the expected vectors
-            /*int doc = vectorValues.advance(i);
-            ///assertEquals("doc " + i + " with id=" + id + " has no vector value", i, doc);
-            float[] scratch = vectorValues.vectorValue();
-            assertArrayEquals("vector did not match for doc " + i + ", id=" + id + ": " + Arrays.toString(scratch),
-                values[id], scratch, 0f);*/
-          }
-        }
-
-        if (hasVector) {
-          int[] centroids = ivfFlatValues.getCentroids();
-          for (int docId : centroids) {
-            IntsRef ivfLink = ivfFlatValues.getIvfLink(docId);
-            totalIvfFlatDocs += ivfLink.length;
           }
         }
       }
     }
-
-    assertEquals(values.length, totalIvfFlatDocs);
   }
 
-  private void add(IndexWriter iw, int id, float[] vector) throws IOException {
+  private void add(IndexWriter iw, int id, float[] vector, VectorValues.VectorIndexType type) throws IOException {
     Document doc = new Document();
     if (vector != null) {
-      doc.add(new VectorField(KNN_IVF_FLAT_FIELD, vector, VectorValues.DistanceFunction.EUCLIDEAN,
-          VectorValues.VectorIndexType.IVFFLAT));
+      doc.add(new VectorField(KNN_VECTOR_FIELD, vector, VectorValues.DistanceFunction.EUCLIDEAN, type));
     }
     doc.add(new StringField("id", Integer.toString(id), Field.Store.YES));
     iw.addDocument(doc);
@@ -189,22 +153,21 @@ public class TestKnnIvfFlat extends LuceneTestCase {
     return vector;
   }
 
-  private QueryResult assertRecall(Directory dir, int expectSize, int topK, float[] value, boolean forceEqual) throws IOException {
+  private QueryResult assertRecall(Directory dir, int expectSize, int topK, float[] value, boolean forceEqual,
+                                   VectorValues.VectorIndexType type) throws IOException {
     try (IndexReader reader = DirectoryReader.open(dir)) {
       final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("HNSW"));
       IndexSearcher searcher = new IndexSearcher(reader, es);
-      Query query = new KnnIvfFlatQuery(KNN_IVF_FLAT_FIELD, value, topK);
+      Query query = type == VectorValues.VectorIndexType.HNSW ? new KnnGraphQuery(KNN_VECTOR_FIELD, value, topK) :
+          new KnnIvfFlatQuery(KNN_VECTOR_FIELD, value, topK);
 
       long startTime = System.currentTimeMillis();
       TopDocs result = searcher.search(query, expectSize);
       long costTime = System.currentTimeMillis() - startTime;
 
-      /*System.out.println("Recall vector " + Arrays.toString(value) + " cost " + costTime + " msec, result size -> "
-          + result.scoreDocs.length + ", details -> " + Arrays.toString(result.scoreDocs));*/
-
       int recallCnt = 0, exactRecallCnt = 0;
       for (LeafReaderContext ctx : reader.leaves()) {
-        VectorValues vector = ctx.reader().getVectorValues(KNN_IVF_FLAT_FIELD);
+        VectorValues vector = ctx.reader().getVectorValues(KNN_VECTOR_FIELD);
         for (ScoreDoc doc : result.scoreDocs) {
           if (vector.seek(doc.doc - ctx.docBase)) {
             ++recallCnt;

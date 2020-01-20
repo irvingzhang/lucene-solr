@@ -96,7 +96,6 @@ public final class IvfFlatCacheReader {
     int[] centroids = ivfFlatValues.getCentroids();
     List<IvFFlatIndex.ClusteredPoints> clusteredPointsList = new ArrayList<>(centroids.length);
     for (int centroid : centroids) {
-      ivfFlatValues.advance(centroid);
       IntsRef ivfLink = ivfFlatValues.getIvfLink(centroid);
       IvFFlatIndex.ClusteredPoints clusteredPoints = new IvFFlatIndex.ClusteredPoints(centroid,
           Arrays.stream(ivfLink.ints).boxed().collect(Collectors.toList()));

@@ -38,7 +38,7 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
 
   private final int numCentroids;
 
-  public KnnIvfFlatScoreWeight(Query query, float score, String field, ScoreMode scoreMode, float[] queryVector, int ef, int numCentroids) {
+  public KnnIvfFlatScoreWeight(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int ef, int numCentroids) {
     super(query, score);
     this.field = field;
     this.scoreMode = scoreMode;

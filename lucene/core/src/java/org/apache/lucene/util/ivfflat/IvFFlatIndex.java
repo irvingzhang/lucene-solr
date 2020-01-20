@@ -66,16 +66,19 @@ public class IvFFlatIndex implements Accountable {
     final List<ImmutableUnClusterableVector> immutableUnClusterableVectors = new ArrayList<>(clusteredPoints.size());
     clusteredPoints.forEach(i -> immutableUnClusterableVectors.add(new ImmutableUnClusterableVector(
         i.getCenter(), this.distanceMeasure.compute(i.getCentroidValue(), query), i.getPoints())));
-    final List<ImmutableUnClusterableVector> clusters = immutableUnClusterableVectors.stream()
-        .sorted((o1, o2) -> {
-          if (o1.distance() < o2.distance()) {
-            return -1;
-          } else if (o2.distance() < o1.distance()) {
-            return 1;
-          }
+    List<ImmutableUnClusterableVector> clusters = immutableUnClusterableVectors;
+    if (clusteredPoints.size() > centroids) {
+      clusters = immutableUnClusterableVectors.stream()
+          .sorted((o1, o2) -> {
+            if (o1.distance() < o2.distance()) {
+              return -1;
+            } else if (o2.distance() < o1.distance()) {
+              return 1;
+            }
 
-          return 0;
-        }).limit(centroids).collect(Collectors.toList());
+            return 0;
+          }).limit(centroids).collect(Collectors.toList());
+    }
 
     SortedImmutableVectorValue results = new SortedImmutableVectorValue(ef, query, this.distanceMeasure);
     clusters.forEach(cluster -> results.insertWithOverflow(cluster));
@@ -89,7 +92,7 @@ public class IvFFlatIndex implements Accountable {
             throw new IllegalStateException("docId=" + docId + " has no vector value");
           }
 
-          results.add(new ImmutableUnClusterableVector(docId, this.distanceMeasure.compute(
+          results.insertWithOverflow(new ImmutableUnClusterableVector(docId, this.distanceMeasure.compute(
               vectorValues.vectorValue(), query)));
         } catch (IOException e) {
           exceptions[0] = e;
@@ -109,13 +112,13 @@ public class IvFFlatIndex implements Accountable {
   private void ensureCentroids(VectorValues vectorValues) throws IOException {
     IOException[] exceptions = new IOException[]{null};
     clusteredPoints.forEach(point -> {
-      if (point.getCentroidValue() == ClusteredPoints.EMPTY_FLOAT) {
+      if (point.getCentroidValue() == null) {
         try {
           if (!vectorValues.seek(point.getCenter())) {
             throw new IllegalStateException("docId=" + point.getCenter() + " has no vector value");
           }
 
-          point.centroidValue = vectorValues.vectorValue();
+          point.centroidValue = vectorValues.vectorValue().clone();
         } catch (IOException e) {
           exceptions[0] = e;
         }
@@ -139,14 +142,13 @@ public class IvFFlatIndex implements Accountable {
   }
 
   public static class ClusteredPoints implements Accountable {
-    final static float[] EMPTY_FLOAT = new float[0];
-    final int centroid;
+    private final int centroid;
     /// TODO cache vector values for center points
-    float[] centroidValue;
-    final List<Integer> pointsNearCentroid;
+    private float[] centroidValue;
+    private final List<Integer> pointsNearCentroid;
 
     public ClusteredPoints(int centroid, List<Integer> pointsNearCentroid) {
-      this(centroid, EMPTY_FLOAT, pointsNearCentroid);
+      this(centroid, null, pointsNearCentroid);
     }
 
     public ClusteredPoints(int centroid, float[] centroidValue, List<Integer> pointsNearCentroid) {
@@ -157,6 +159,10 @@ public class IvFFlatIndex implements Accountable {
 
     public int getCenter() {
       return this.centroid;
+    }
+
+    public void setCentroidValue(float[] centroidValue) {
+      this.centroidValue = centroidValue;
     }
 
     public List<Integer> getPoints() {

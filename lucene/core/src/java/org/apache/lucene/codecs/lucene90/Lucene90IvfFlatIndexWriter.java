@@ -124,8 +124,6 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
     ivfFlatMeta.writeInt(centroids.length);
 
     for (int centroid : centroids) {
-      ivfFlatValues.advance(centroid);
-
       ivfFlatMeta.writeVInt(centroid);
       IntsRef ivfFlatLink = ivfFlatValues.getIvfLink(centroid);
       ivfFlatMeta.writeInt(ivfFlatLink.length);

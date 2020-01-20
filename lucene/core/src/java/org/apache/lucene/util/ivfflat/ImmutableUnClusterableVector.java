@@ -29,7 +29,7 @@ public class ImmutableUnClusterableVector implements Comparable<ImmutableUnClust
   private final List<Integer> points;
 
   public ImmutableUnClusterableVector(int docId, float instance) {
-    this(docId, docId, Collections.EMPTY_LIST);
+    this(docId, instance, Collections.EMPTY_LIST);
   }
 
   public ImmutableUnClusterableVector(int docId, float distance, List<Integer> points) {

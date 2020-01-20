@@ -39,6 +39,6 @@ public class SortedImmutableVectorValue extends PriorityQueue<ImmutableUnCluster
    */
   @Override
   protected boolean lessThan(ImmutableUnClusterableVector a, ImmutableUnClusterableVector b) {
-    return a.distance() < b.distance();
+    return a.distance() > b.distance();
   }
 }

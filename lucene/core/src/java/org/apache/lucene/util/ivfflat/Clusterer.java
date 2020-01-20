@@ -31,8 +31,20 @@ public interface Clusterer<T extends Clusterable> {
     /** Cluster points on the basis of a similarity measure
      *
      * @param trainingPoints collection of training points.
+     *
+     * @throws NoSuchElementException
      */
     List<? extends Cluster<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException;
+
+    /**
+     * Cluster points on the basis of a similarity measure
+     *
+     * @param trainingPoints collection of training points.
+     * @param expectK specify the parameter for k-means training
+     * @return
+     * @throws NoSuchElementException
+     */
+    List<? extends Cluster<T>> cluster(Collection<T> trainingPoints, int expectK) throws NoSuchElementException;
 
     /** Distance by some measure means **/
     float distance(Clusterable p1, Clusterable p2);

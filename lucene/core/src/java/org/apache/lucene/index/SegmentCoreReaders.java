@@ -185,7 +185,7 @@ final class SegmentCoreReaders {
       Throwable th = null;
       try (Closeable finalizer = this::notifyCoreClosedListeners){
         IOUtils.close(termVectorsLocal, fieldsReaderLocal, fields, termVectorsReaderOrig, fieldsReaderOrig,
-                      cfsReader, normsProducer, pointsReader, knnGraphReader);
+                      cfsReader, normsProducer, pointsReader, knnGraphReader, ivfFlatIndexReader);
       }
     }
   }

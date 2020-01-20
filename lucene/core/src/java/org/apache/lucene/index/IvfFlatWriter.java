@@ -173,32 +173,6 @@ public class IvfFlatWriter implements Accountable {
 
                 return new IntsRef();
               }
-
-              @Override
-              public boolean advanceExact(int target) throws IOException {
-                int result = advance(target);
-                return result == target;
-              }
-
-              @Override
-              public int docID() {
-                return NO_MORE_DOCS;
-              }
-
-              @Override
-              public int nextDoc() throws IOException {
-                return NO_MORE_DOCS;
-              }
-
-              @Override
-              public int advance(int target) throws IOException {
-                return target;
-              }
-
-              @Override
-              public long cost() {
-                return ivfFlatCacheWriter.rawVectorsArray().length;
-              }
             };
           }
         });
