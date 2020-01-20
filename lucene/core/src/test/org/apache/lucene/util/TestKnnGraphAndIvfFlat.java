@@ -58,13 +58,13 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
   }
 
   public void testComparison() throws Exception {
-    int numDoc = 5000, dimension = 100;
+    int numDocs = 4000, dimension = 100;
 
-    float[][] randomVectors = randomVectors(numDoc, dimension);
+    float[][] randomVectors = randomVectors(numDocs, dimension);
 
-    RunCase(numDoc, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT);
+    RunCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT);
 
-    RunCase(numDoc, dimension, randomVectors, VectorValues.VectorIndexType.HNSW);
+    RunCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.HNSW);
   }
 
   private void RunCase(int numDoc, int dimension, float[][] randomVectors, VectorValues.VectorIndexType type) throws Exception {
@@ -80,7 +80,7 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
       long totalCostTime = 0;
       int totalRecallCnt = 0;
       QueryResult result;
-      int testRecall = Math.min(numDoc, 1000);
+      int testRecall = Math.min(numDoc, 2000);
       for (int i = 0; i < testRecall; ++i) {
         result = assertRecall(dir, 1, 1, randomVectors[i], false, type);
         totalCostTime += result.costTime;

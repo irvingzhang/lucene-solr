@@ -18,8 +18,10 @@
 package org.apache.lucene.codecs.lucene90;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.lucene.codecs.CodecUtil;
@@ -28,11 +30,13 @@ import org.apache.lucene.codecs.IvfFlatIndexWriter;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.IvfFlatValues;
+import org.apache.lucene.index.IvfFlatWriter;
 import org.apache.lucene.index.MergeState;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.Counter;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.IntsRef;
 
@@ -167,8 +171,45 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
   }
 
   @Override
-  protected void mergeOneField(FieldInfo fieldInfo, MergeState state) {
-    /// TODO
+  protected void mergeOneField(FieldInfo fieldInfo, MergeState state) throws IOException {
+    int readerLength = state.ivfFlatIndexReaders.length;
+    List<Lucene90KnnGraphWriter.VectorValuesSub> subs = new ArrayList<>(readerLength);
+    int dims = -1;
+    for (int i = 0; i < readerLength; ++i) {
+      IvfFlatIndexReader ivfFlatIndexReader = state.ivfFlatIndexReaders[i];
+      if (ivfFlatIndexReader != null) {
+        if (fieldInfo != null && fieldInfo.hasVectorValues()) {
+          int segmentDims = fieldInfo.getVectorNumDimensions();
+          if (dims == -1) {
+            dims = segmentDims;
+          } else {
+            throw new IllegalStateException("Varying dimensions for vector-valued field " + fieldInfo.name
+                + ": " + dims + "!=" + segmentDims);
+          }
+
+          VectorValues values = ivfFlatIndexReader.getVectorValues(fieldInfo.name);
+          subs.add(new Lucene90KnnGraphWriter.VectorValuesSub(i, state.docMaps[i], values));
+        }
+      }
+    }
+
+    IvfFlatWriter ivfFlatWriter = new IvfFlatWriter(fieldInfo, Counter.newCounter());
+    for (int i = 0; i < subs.size(); ++i) {
+      Lucene90KnnGraphWriter.VectorValuesSub sub = subs.get(i);
+      MergeState.DocMap docMap = state.docMaps[sub.segmentIndex];
+      int docId;
+      while ((docId = sub.nextDoc()) != NO_MORE_DOCS) {
+        int mappedDocId = docMap.get(docId);
+        if (mappedDocId == -1) {
+          continue;
+        }
+
+        assert  sub.values.docID() == docId;
+        ivfFlatWriter.addValue(mappedDocId, sub.values.binaryValue());
+      }
+    }
+
+    ivfFlatWriter.flush(null, this);
   }
 
   /**

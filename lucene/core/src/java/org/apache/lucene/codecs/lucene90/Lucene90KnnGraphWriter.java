@@ -231,7 +231,7 @@ public final class Lucene90KnnGraphWriter extends KnnGraphWriter {
   }
 
   /** Tracks state of one binary sub-reader that we are merging */
-  private static class VectorValuesSub extends DocIDMerger.Sub {
+  public static class VectorValuesSub extends DocIDMerger.Sub {
 
     final VectorValues values;
     final int segmentIndex;

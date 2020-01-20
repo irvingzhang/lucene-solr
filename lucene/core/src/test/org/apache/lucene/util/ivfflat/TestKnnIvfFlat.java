@@ -86,13 +86,13 @@ public class TestKnnIvfFlat extends LuceneTestCase {
   }
 
   public void testSearch() throws Exception {
-    int numDoc = 100000;
+    int numDocs = 50000;
     int dimension = 100;
-    float[][] randomVectors = randomVectors(numDoc, dimension);
+    float[][] randomVectors = randomVectors(numDocs, dimension);
 
     try (Directory dir = newDirectory(); IndexWriter iw = new IndexWriter(
         dir, newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
-      for (int i = 0; i < numDoc; ++i) {
+      for (int i = 0; i < numDocs; ++i) {
         add(iw, i, randomVectors[i]);
       }
 
@@ -102,14 +102,14 @@ public class TestKnnIvfFlat extends LuceneTestCase {
       long totalCostTime = 0;
       int totalRecallCnt = 0;
       QueryResult result;
-      int testRecall = 1000;
+      int testRecall = Math.min(2000, numDocs);
       for (int i = 0; i < testRecall; ++i) {
         result = assertRecall(dir, 1, 1, randomVectors[i], false);
         totalCostTime += result.costTime;
         totalRecallCnt += result.recallCnt;
       }
 
-      System.out.println("Total number of docs -> " + numDoc + ", dimension -> " + dimension +
+      System.out.println("Total number of docs -> " + numDocs + ", dimension -> " + dimension +
           ", recall experiments -> " + testRecall + ", exact recall times -> " + totalRecallCnt +
           ", total search time -> " + totalCostTime + "msec, avg search time -> " +
           1.0F * totalCostTime / testRecall + "msec, recall percent -> " +

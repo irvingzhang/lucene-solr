@@ -21,8 +21,8 @@ import java.io.Closeable;
 import java.io.IOException;
 
 import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.MergeState;
-import org.apache.lucene.index.VectorValues;
 
 public abstract class IvfFlatIndexWriter implements Closeable {
   /** Sole constructor */
@@ -46,14 +46,14 @@ public abstract class IvfFlatIndexWriter implements Closeable {
       }
     }
 
-    mergeState.mergeFieldInfos.forEach(fieldInfo -> {
+    for (FieldInfo fieldInfo : mergeState.mergeFieldInfos) {
       if (fieldInfo.hasVectorValues()) {
         mergeOneField(fieldInfo, mergeState);
       }
-    });
+    }
 
     finish();
   }
 
-  protected abstract void mergeOneField(FieldInfo fieldInfo, MergeState state);
+  protected abstract void mergeOneField(FieldInfo fieldInfo, MergeState state) throws IOException;
 }
