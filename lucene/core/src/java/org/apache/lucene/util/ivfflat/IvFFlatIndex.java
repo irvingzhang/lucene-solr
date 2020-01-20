@@ -83,15 +83,17 @@ public class IvFFlatIndex implements Accountable {
     /// Phase two -> search topK center points and their inverted index links
     IOException[] exceptions = new IOException[]{null};
     clusters.forEach(cluster -> cluster.points().forEach(docId -> {
-      try {
-        if (!vectorValues.seek(docId)) {
-          throw new IllegalStateException("docId=" + docId + " has no vector value");
-        }
+      if (docId != cluster.docId()) {
+        try {
+          if (!vectorValues.seek(docId)) {
+            throw new IllegalStateException("docId=" + docId + " has no vector value");
+          }
 
-        results.add(new ImmutableUnClusterableVector(docId, this.distanceMeasure.compute(
-            vectorValues.vectorValue(), query)));
-      } catch (IOException e) {
-        exceptions[0] = e;
+          results.add(new ImmutableUnClusterableVector(docId, this.distanceMeasure.compute(
+              vectorValues.vectorValue(), query)));
+        } catch (IOException e) {
+          exceptions[0] = e;
+        }
       }
     }));
 

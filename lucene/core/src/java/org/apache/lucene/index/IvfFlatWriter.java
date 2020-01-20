@@ -145,7 +145,7 @@ public class IvfFlatWriter implements Accountable {
            */
           @Override
           public IvfFlatValues getIvfFlatValues(String field) throws IOException {
-            List<ImmutableClusterableVector> immutableClusterableVectors = new ArrayList<>();
+            final List<ImmutableClusterableVector> immutableClusterableVectors = new ArrayList<>();
             final DocIdSetIterator docsWithField = docsWithFieldVec.iterator();
             int idx = 0;
             for (int doc = docsWithField.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = docsWithField.nextDoc()) {
