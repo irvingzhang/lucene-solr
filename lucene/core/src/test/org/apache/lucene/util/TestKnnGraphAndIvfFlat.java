@@ -58,14 +58,12 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
   }
 
   public void testComparison() throws Exception {
-    int numDoc = 10000, dimension = 100;
+    int numDoc = 5000, dimension = 100;
 
     float[][] randomVectors = randomVectors(numDoc, dimension);
 
-    System.out.println("start running for IVFFlat ...");
     RunCase(numDoc, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT);
 
-    System.out.println("start running for HNSW...");
     RunCase(numDoc, dimension, randomVectors, VectorValues.VectorIndexType.HNSW);
   }
 

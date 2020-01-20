@@ -134,6 +134,7 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
         // write the smallest friend id
         int ivfElemId = ivfFlatLink.ints[ivfFlatLink.offset];
         ivfFlatMeta.writeVInt(ivfElemId);
+        /// write its order in segment
         ivfFlatMeta.writeVInt(vecToDocOffset.get(ivfElemId));
         for (int idx = ivfFlatLink.offset + 1; idx < stop; ++idx) {
           // write delta

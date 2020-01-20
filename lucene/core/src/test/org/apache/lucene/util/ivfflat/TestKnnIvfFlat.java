@@ -86,7 +86,7 @@ public class TestKnnIvfFlat extends LuceneTestCase {
   }
 
   public void testSearch() throws Exception {
-    int numDoc = 10000;
+    int numDoc = 100000;
     int dimension = 100;
     float[][] randomVectors = randomVectors(numDoc, dimension);
 
@@ -136,15 +136,8 @@ public class TestKnnIvfFlat extends LuceneTestCase {
             ++totalIvfFlatDocs;
             // documents without IvfFlatValues have no vectors or neighbors
             assertNotEquals("document " + id + " was not expected to have values", i, vectorValues.advance(i));
-            /// assertNotEquals(i, ivfFlatValues.advance(i));
           } else {
             hasVector = true;
-            // documents with KnnGraphValues have the expected vectors
-            /*int doc = vectorValues.advance(i);
-            ///assertEquals("doc " + i + " with id=" + id + " has no vector value", i, doc);
-            float[] scratch = vectorValues.vectorValue();
-            assertArrayEquals("vector did not match for doc " + i + ", id=" + id + ": " + Arrays.toString(scratch),
-                values[id], scratch, 0f);*/
           }
         }
 

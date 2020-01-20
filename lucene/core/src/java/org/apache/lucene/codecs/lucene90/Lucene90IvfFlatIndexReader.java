@@ -237,8 +237,8 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
     }
   }
 
-  /** Read the knn graph from the index input stream */
-  private final static class IndexedIvfFlatReader extends IvfFlatValues {
+  /** Read the ivfflat index hole in memory */
+  private static final class IndexedIvfFlatReader extends IvfFlatValues {
     final long maxDoc;
 
     final IvfFlatEntry ivfFlatEntry;

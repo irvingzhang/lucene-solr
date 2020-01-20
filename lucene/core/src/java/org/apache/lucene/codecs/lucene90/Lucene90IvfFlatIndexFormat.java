@@ -19,12 +19,41 @@ package org.apache.lucene.codecs.lucene90;
 
 import java.io.IOException;
 
+import org.apache.lucene.codecs.CodecUtil;
+import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.IvfFlatIndexFormat;
 import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.IvfFlatIndexWriter;
+import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
+import org.apache.lucene.store.DataOutput;
 
+/**
+ * Lucene 9.0 IVFFlat index format.
+ * <p>The centroid and the associated points (clustered by K-Means clustering) are write into the file with suffix <tt>.ifi</tt>.</p>
+ * <p>
+ *   IVFFlat file (.ifi) --&gt; Header,FieldNumber,VectorDataOffset,VectorDataLength,CentroidSize, &lt;Centroid,
+ *   IVFListSize,FirstDocID,FirstDocOrder, &lt;DocIDDelta,DocOrder&gt; <sup>IVFListSize-1</sup>&gt;<sup>CentroidSize</sup>,Footer
+ * </p>
+ * <p>Field types:</p>
+ * <ul>
+ *   <li>Header --&gt; {@link CodecUtil#checkIndexHeader IndexHeader}</li>
+ *   <li>FieldNumber,CentroidSize,IVFListSize --&gt; {@link DataOutput#writeInt Int}</li>
+ *   <li>VectorDataOffset,VectorDataLength --&gt; {@link DataOutput#writeVLong VLong}</li>
+ *   <li>Centroid,FirstDocID,FirstDocOrder,DocIDDelta,DocOrder --&gt; {@link DataOutput#writeVInt VInt}</li>
+ *   <li>Footer --&gt; {@link CodecUtil#writeFooter CodecFooter}</li>
+ * </ul>
+ * Field Descriptions:
+ * <ul>
+ *   <li>FieldNumber: the field's number. Note that unlike previous versions of
+ *       Lucene, the fields are not numbered implicitly by their order in the
+ *       file, instead explicitly.</li>
+ *   <li>Centroid: the center point of k-means.</li>
+ * </ul>
+ *
+ * @lucene.experimental
+ */
 public class Lucene90IvfFlatIndexFormat extends IvfFlatIndexFormat {
   static final String META_CODEC_NAME = "Lucene90IvfFlatIndexFormatMeta";
 

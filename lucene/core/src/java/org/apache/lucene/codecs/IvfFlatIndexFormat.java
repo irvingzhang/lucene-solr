@@ -43,7 +43,7 @@ public abstract class IvfFlatIndexFormat {
    */
   public abstract IvfFlatIndexReader fieldsReader(SegmentReadState state) throws IOException;
 
-  public static IvfFlatIndexFormat EMPTY = new IvfFlatIndexFormat() {
+  public static final IvfFlatIndexFormat EMPTY = new IvfFlatIndexFormat() {
 
     /**
      * Returns a {@link KnnGraphWriter} to write the vectors and knn-graph to the index.
@@ -65,7 +65,7 @@ public abstract class IvfFlatIndexFormat {
          */
         @Override
         public long ramBytesUsed() {
-          return 0;
+          return 0L;
         }
 
         /**
