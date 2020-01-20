@@ -123,6 +123,7 @@ public class TestBlockWriter extends LuceneTestCase {
         0,
         0,
         VectorValues.DistanceFunction.NONE,
+        VectorValues.VectorIndexType.NONE,
         true
     );
   }

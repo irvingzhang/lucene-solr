@@ -15,9 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.cluster;
+package org.apache.lucene.util.ivfflat;
 
-public interface Clusterable {
-  /** Get point value **/
-  float[] getPoint();
+public interface DistanceMeasure {
+  float compute(float[] v1, float[] v2);
 }

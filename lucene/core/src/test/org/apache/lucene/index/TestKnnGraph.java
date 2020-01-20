@@ -31,7 +31,6 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.VectorField;
 import org.apache.lucene.document.StringField;
-import org.apache.lucene.search.KnnExactDeletionCondition;
 import org.apache.lucene.search.KnnGraphQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
@@ -98,44 +97,6 @@ public class TestKnnGraph extends LuceneTestCase {
       assertConsistentGraph(iw, values);
 
       assertRecall(dir, 1, values[0]);
-    }
-  }
-
-  public void testDocsDeletionAndRecall() throws  Exception {
-    try (Directory dir = newDirectory();
-         IndexWriter iw = new IndexWriter(dir, newIndexWriterConfig(null)
-             .setMaxBufferedDocs(2).setCodec(Codec.forName("Lucene90")))) {
-      float[][] values = new float[][]{new float[]{0, 1, 2},
-          new float[]{2, 3, 4}, new float[]{0, 1, 2}, new float[]{2, 3, 4},
-          new float[]{3, 3, 4}, new float[]{3, 5, 7}
-      };
-
-      for (int idx = 0; idx < values.length; ++idx) {
-        add(iw, idx, values[idx]);
-      }
-
-      iw.commit();
-      assertConsistentGraph(iw, values);
-
-      assertRecall(dir, 2, values[0]);
-      assertRecall(dir, 2, values[1]);
-      assertRecall(dir, 1, values[5]);
-
-      KnnGraphQuery query = new KnnExactDeletionCondition(KNN_GRAPH_FIELD, new float[]{0, 1.2f, 2.1f}, 3);
-      iw.deleteDocuments(query);
-      iw.commit();
-
-      assertRecall(dir, 2, values[0]);
-      assertRecall(dir, 2, values[1]);
-      assertRecall(dir, 1, values[5]);
-
-      query = new KnnExactDeletionCondition(KNN_GRAPH_FIELD, values[0], 1);
-      iw.deleteDocuments(query);
-      iw.commit();
-
-      assertRecall(dir, 2, values[1]);
-      assertRecall(dir, 1, values[4]);
-      assertRecall(dir, 1, values[5]);
     }
   }
 

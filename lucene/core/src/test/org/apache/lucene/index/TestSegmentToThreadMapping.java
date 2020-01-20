@@ -25,7 +25,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MatchAllDocsQuery;
@@ -108,6 +107,11 @@ public class TestSegmentToThreadMapping extends LuceneTestCase {
 
       @Override
       public VectorValues getVectorValues(String field) {
+        return null;
+      }
+
+      @Override
+      public IvfFlatValues getIvfFlatValues(String field) {
         return null;
       }
 

@@ -17,24 +17,37 @@
 
 package org.apache.lucene.util.ivfflat;
 
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
-public class ImmutableClusterableVector implements Comparable<ImmutableClusterableVector>, Clusterable {
+public class ImmutableUnClusterableVector implements Comparable<ImmutableUnClusterableVector> {
   private final int docId;
 
-  private final float[] vectorValues;
+  private final float distance;
 
-  public ImmutableClusterableVector(int docId, float[] vectorValues) {
-    this.docId = docId;
-    this.vectorValues = vectorValues;
+  /// if current point is a center point, the points save its clustered points
+  private final List<Integer> points;
+
+  public ImmutableUnClusterableVector(int docId, float instance) {
+    this(docId, docId, Collections.EMPTY_LIST);
   }
 
-  /**
-   * Returns document id of this point
-   */
-  @Override
+  public ImmutableUnClusterableVector(int docId, float distance, List<Integer> points) {
+    this.docId = docId;
+    this.distance = distance;
+    this.points = points;
+  }
+
   public int docId() {
     return this.docId;
+  }
+
+  public float distance() {
+    return this.distance;
+  }
+
+  public List<Integer> points() {
+    return this.points;
   }
 
   /**
@@ -77,20 +90,7 @@ public class ImmutableClusterableVector implements Comparable<ImmutableClusterab
    *                              from being compared to this object.
    */
   @Override
-  public int compareTo(ImmutableClusterableVector o) {
-    return this.docId - o.docId();
-  }
-
-  @Override
-  public float[] getPoint() {
-    return this.vectorValues;
-  }
-
-  @Override
-  public String toString() {
-    return "ImmutableClusterableVector{" +
-        "docId=" + docId +
-        ", vectorValues=" + Arrays.toString(vectorValues) +
-        '}';
+  public int compareTo(ImmutableUnClusterableVector o) {
+    return this.docId - o.docId;
   }
 }

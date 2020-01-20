@@ -15,14 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.cluster;
+package org.apache.lucene.util.ivfflat;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-public interface Clusterer<T extends Clusterable> {
-    List<? extends Cluster<T>> cluster(Collection<T> points) throws NoSuchElementException;
+import org.apache.lucene.util.ivfflat.Cluster;
+import org.apache.lucene.util.ivfflat.Clusterable;
 
-    double distance(Clusterable p1, Clusterable p2);
+/**
+ * {@code Clusterer} is a executor for clustering.
+ */
+public interface Clusterer<T extends Clusterable> {
+    /** Cluster points on the basis of a similarity measure
+     *
+     * @param trainingPoints collection of training points.
+     */
+    List<? extends Cluster<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException;
+
+    /** Distance by some measure means **/
+    float distance(Clusterable p1, Clusterable p2);
 }

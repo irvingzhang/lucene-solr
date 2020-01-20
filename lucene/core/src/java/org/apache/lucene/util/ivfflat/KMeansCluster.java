@@ -15,27 +15,25 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.cluster;
+package org.apache.lucene.util.ivfflat;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
 
 import org.apache.lucene.index.VectorValues;
-import org.apache.lucene.util.ivfflat.ImmutableClusterableVector;
 
 /**
  * Migrate from {@link org.apache.commons.math3.ml.clustering.KMeansPlusPlusClusterer}
  * with minor refactoring, thereby avoid introducing external dependencies.
  */
 public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
-  private static final int MAX_KMEANS_ITERATIONS = 1000;
+  private static final int MAX_KMEANS_ITERATIONS = 20;
 
-  private static final int MIN_KMEANS_K = 200;
+  private static final int DEFAULT_KMEANS_K = 200;
 
   private int maxIterations;
 
@@ -46,7 +44,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   DistanceMeasure distanceMeasure;
 
   public KMeansCluster(VectorValues.DistanceFunction distFunc) {
-    this(MAX_KMEANS_ITERATIONS, MIN_KMEANS_K, distFunc);
+    this(MAX_KMEANS_ITERATIONS, DEFAULT_KMEANS_K, distFunc);
   }
 
   public KMeansCluster(int k, VectorValues.DistanceFunction distFunc) {
@@ -60,46 +58,48 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
     this.random = new Random();
   }
 
+  /** Cluster points on the basis of a similarity measure
+   *
+   * @param trainingPoints collection of training points.
+   */
   @Override
-  public List<Centroid<T>> cluster(Collection<T> points) throws NoSuchElementException {
-    assert !points.isEmpty();
+  public List<Centroid<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException {
+    assert !trainingPoints.isEmpty();
 
-    /// adaptive choosing value for k
-    this.k = (int) Math.max(this.k, Math.sqrt(points.size()));
+    /// adaptively choose the value for k, where k = sqrt(pointSize / 2)
+    int size = trainingPoints.size();
+    this.k = (int) Math.min(Math.sqrt(size >> 1), size);
 
-    if (points.size() < this.k) {
-      return Collections.EMPTY_LIST;
-    } else {
-      List<Centroid<T>> clusters = this.initCenters(points);
-      int[] assignments = new int[points.size()];
-      this.assignPointsToClusters(clusters, points, assignments);
-      int max = this.maxIterations < 0 ? 2147483647 : this.maxIterations;
+    List<Centroid<T>> clusters = this.initCenters(trainingPoints);
+    int[] assignments = new int[trainingPoints.size()];
+    this.assignPointsToClusters(clusters, trainingPoints, assignments);
+    int max = this.maxIterations < 0 ? 2147483647 : this.maxIterations;
 
-      for (int count = 0; count < max; ++count) {
-        boolean emptyCluster = false;
-        List<Centroid<T>> newClusters = new ArrayList<>();
+    for (int count = 0; count < max; ++count) {
+      boolean emptyCluster = false;
+      List<Centroid<T>> newClusters = new ArrayList<>();
 
-        Clusterable newCenter;
-        for (Iterator<Centroid<T>> i$ = clusters.iterator(); i$.hasNext();
-             newClusters.add(new Centroid<>(newCenter))) {
-          final Centroid<T> cluster = i$.next();
-          if (cluster.getPoints().isEmpty()) {
-            newCenter = this.getPointFromLargestNumberCluster(clusters);
-            emptyCluster = true;
-          } else {
-            newCenter = this.centroidOf(cluster.getPoints(), cluster.getCenter().getPoint().length);
-          }
-        }
-
-        int changes = this.assignPointsToClusters(newClusters, points, assignments);
-        clusters = newClusters;
-        if (changes == 0 && !emptyCluster) {
-          return newClusters;
+      Clusterable newCenter;
+      for (Iterator<Centroid<T>> i$ = clusters.iterator(); i$.hasNext();
+           newClusters.add(new Centroid<>(newCenter))) {
+        final Centroid<T> cluster = i$.next();
+        if (cluster.getPoints().isEmpty()) {
+          newCenter = this.getPointFromLargestNumberCluster(clusters);
+          emptyCluster = true;
+        } else {
+          newCenter = this.centroidOf(cluster.getCenter().docId(), cluster.getPoints(),
+              cluster.getCenter().getPoint().length);
         }
       }
 
-      return clusters;
+      int changes = this.assignPointsToClusters(newClusters, trainingPoints, assignments);
+      clusters = newClusters;
+      if (changes == 0 && !emptyCluster) {
+        return newClusters;
+      }
     }
+
+    return clusters;
   }
 
   private List<Centroid<T>> initCenters(Collection<T> points) {
@@ -230,7 +230,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
     }
   }
 
-  private Clusterable centroidOf(Collection<T> points, int dimension) {
+  private Clusterable centroidOf(int docId, Collection<T> points, int dimension) {
     float[] centroid = new float[dimension];
 
     for (T p : points) {
@@ -245,23 +245,15 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
       centroid[i] /= (float) points.size();
     }
 
-    return new ImmutableClusterableVector(0, centroid);
+    return new ImmutableClusterableVector(docId, centroid);
   }
 
   @Override
-  public double distance(Clusterable p1, Clusterable p2) {
+  public float distance(Clusterable p1, Clusterable p2) {
     return this.distanceMeasure.compute(p1.getPoint(), p2.getPoint());
   }
 
   public int getK() {
     return k;
-  }
-
-  public int getMaxIterations() {
-    return maxIterations;
-  }
-
-  public DistanceMeasure getDistanceMeasure() {
-    return distanceMeasure;
   }
 }

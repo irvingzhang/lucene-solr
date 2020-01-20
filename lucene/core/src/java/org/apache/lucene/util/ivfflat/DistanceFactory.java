@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.cluster;
+package org.apache.lucene.util.ivfflat;
 
 import org.apache.lucene.index.VectorValues;
 
@@ -26,7 +26,7 @@ public final class DistanceFactory {
         return (v1, v2) -> {
           assert v1.length == v2.length;
 
-          double sum = 0.0D;
+          float sum = 0.0F;
           for (int i = 0; i < v1.length; ++i) {
             sum += Float.intBitsToFloat(2147483647 & Float.floatToRawIntBits(v1[i] - v2[i]));
           }
@@ -38,13 +38,13 @@ public final class DistanceFactory {
         return (v1, v2) -> {
           assert v1.length == v2.length;
 
-          double sum = 0.0D;
+          float sum = 0.0F;
           for (int i = 0; i < v1.length; ++i) {
             float diff = v1[i] - v2[i];
             sum += diff * diff;
           }
 
-          return Math.sqrt(sum);
+          return (float) Math.sqrt(sum);
         };
 
       case COSINE:
@@ -57,7 +57,7 @@ public final class DistanceFactory {
             squareSum1 += v1[i] * v1[i];
             squareSum2 += v2[i] * v2[i];
           }
-          return 1.0D - sum / (Math.sqrt(squareSum1) * Math.sqrt(squareSum2));
+          return (float) (1.0F - sum / (Math.sqrt(squareSum1) * Math.sqrt(squareSum2)));
         };
 
       default:

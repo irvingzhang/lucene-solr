@@ -15,19 +15,15 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.cluster;
+package org.apache.lucene.util.ivfflat;
 
-import java.util.ArrayList;
-import java.util.List;
+/**
+ * Any class that needs clustering must inherit {@code Clusterable} interface.
+ */
+public interface Clusterable {
+  /** Returns the doc id. **/
+  int docId();
 
-public class Cluster<T extends Clusterable> {
-  private final ArrayList<T> points = new ArrayList<>();
-
-  public void addPoint(T point) {
-    this.points.add(point);
-  }
-
-  public List<T> getPoints() {
-    return this.points;
-  }
+  /** Get point value. **/
+  float[] getPoint();
 }

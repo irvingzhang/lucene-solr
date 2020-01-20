@@ -24,6 +24,7 @@ import java.util.Locale;
 
 import org.apache.lucene.codecs.DocValuesProducer;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.KnnGraphReader;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsReader;
@@ -81,6 +82,8 @@ public class MergeState {
   /** KNN Graph readers to merge */
   public final KnnGraphReader[] knnGraphReaders;
 
+  public final IvfFlatIndexReader[] ivfFlatIndexReaders;
+
   /** Max docs per reader */
   public final int[] maxDocs;
 
@@ -108,6 +111,7 @@ public class MergeState {
     docValuesProducers = new DocValuesProducer[numReaders];
     pointsReaders = new PointsReader[numReaders];
     knnGraphReaders = new KnnGraphReader[numReaders];
+    ivfFlatIndexReaders = new IvfFlatIndexReader[numReaders];
     fieldInfos = new FieldInfos[numReaders];
     liveDocs = new Bits[numReaders];
 
@@ -148,6 +152,11 @@ public class MergeState {
       knnGraphReaders[i] = reader.getKnnGraphReader();
       if (knnGraphReaders[i] != null) {
         knnGraphReaders[i] = knnGraphReaders[i].getMergeInstance();
+      }
+
+      ivfFlatIndexReaders[i] = reader.getIvfFlatIndexReader();
+      if (ivfFlatIndexReaders[i] != null) {
+        ivfFlatIndexReaders[i] = ivfFlatIndexReaders[i].getMergeInstance();
       }
 
       numDocs += reader.numDocs();

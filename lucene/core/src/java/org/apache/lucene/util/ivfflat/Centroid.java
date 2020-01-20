@@ -15,8 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.cluster;
+package org.apache.lucene.util.ivfflat;
 
+/**
+ * {@code Centroid} is a model for center point in k-means clustering.
+ */
 public class Centroid<T extends Clusterable> extends Cluster<T> {
   private final Clusterable center;
 

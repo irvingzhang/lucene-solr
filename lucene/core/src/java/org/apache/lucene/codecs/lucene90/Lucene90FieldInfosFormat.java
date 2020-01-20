@@ -20,6 +20,7 @@ package org.apache.lucene.codecs.lucene90;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.DocValuesFormat;
@@ -172,11 +173,13 @@ public final class Lucene90FieldInfosFormat extends FieldInfosFormat {
           }
           final int vectorNumDimensions = input.readVInt();
           final VectorValues.DistanceFunction vectorDistFunc = getDistFunc(input, input.readByte());
+          final VectorValues.VectorIndexType indexType = getVecIndexType(input, input.readByte());
 
           try {
             infos[i] = new FieldInfo(name, fieldNumber, storeTermVector, omitNorms, storePayloads, 
                                      indexOptions, docValuesType, dvGen, attributes,
-                                     pointDataDimensionCount, pointIndexDimensionCount, pointNumBytes, vectorNumDimensions, vectorDistFunc, isSoftDeletesField);
+                                     pointDataDimensionCount, pointIndexDimensionCount, pointNumBytes, vectorNumDimensions,
+                                     vectorDistFunc, indexType, isSoftDeletesField);
             infos[i].checkConsistency();
           } catch (IllegalStateException e) {
             throw new CorruptIndexException("invalid fieldinfo for field: " + name + ", fieldNumber=" + fieldNumber, input, e);
@@ -249,11 +252,32 @@ public final class Lucene90FieldInfosFormat extends FieldInfosFormat {
     }
   }
 
+  private static byte indexTypeByte(VectorValues.VectorIndexType type) {
+    switch (type) {
+      case NONE:
+      case HNSW:
+      case IVFFLAT:
+        return (byte)type.id();
+
+      default:
+        // BUG
+        throw new AssertionError("unhandled VectorIndexType: " + type);
+    }
+  }
+
   private static VectorValues.DistanceFunction getDistFunc(IndexInput input, byte b) throws IOException {
     try {
       return VectorValues.DistanceFunction.fromId(b);
     } catch (IllegalArgumentException e) {
       throw new CorruptIndexException("invalid distance function: " + b, input);
+    }
+  }
+
+  private static VectorValues.VectorIndexType getVecIndexType(IndexInput in, byte b) throws IOException {
+    try {
+      return VectorValues.VectorIndexType.fromId(b);
+    } catch (NoSuchElementException e) {
+      throw new CorruptIndexException("invalid vector index type: " + b, in);
     }
   }
 
@@ -331,6 +355,7 @@ public final class Lucene90FieldInfosFormat extends FieldInfosFormat {
         }
         output.writeVInt(fi.getVectorNumDimensions());
         output.writeByte(distFuncByte(fi.getVectorDistFunc()));
+        output.writeByte(indexTypeByte(fi.getVectorIndexType()));
       }
       CodecUtil.writeFooter(output);
     }

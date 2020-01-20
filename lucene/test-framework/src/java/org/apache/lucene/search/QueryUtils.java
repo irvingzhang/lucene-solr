@@ -25,6 +25,7 @@ import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IvfFlatValues;
 import org.apache.lucene.index.KnnGraphValues;
 import org.apache.lucene.index.LeafMetaData;
 import org.apache.lucene.index.LeafReader;
@@ -211,6 +212,16 @@ public class QueryUtils {
 
       @Override
       public VectorValues getVectorValues(String field) throws IOException {
+        return null;
+      }
+
+      /**
+       * Returns the {@link IvfFlatValues} for the given {@code field}
+       *
+       * @param field field name for retrieval
+       */
+      @Override
+      public IvfFlatValues getIvfFlatValues(String field) {
         return null;
       }
 

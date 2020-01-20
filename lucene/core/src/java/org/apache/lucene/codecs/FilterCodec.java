@@ -113,4 +113,9 @@ public abstract class FilterCodec extends Codec {
   public KnnGraphFormat knnGraphFormat() {
     return delegate.knnGraphFormat();
   }
+
+  @Override
+  public IvfFlatIndexFormat ivfFlatIndexFormat() {
+    return delegate.ivfFlatIndexFormat();
+  }
 }

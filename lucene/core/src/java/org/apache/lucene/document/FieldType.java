@@ -47,6 +47,7 @@ public class FieldType implements IndexableFieldType  {
   private int dimensionNumBytes;
   private int vectorNumDimensions;
   private VectorValues.DistanceFunction vectorDistFunc = VectorValues.DistanceFunction.NONE;
+  private VectorValues.VectorIndexType vectorIndexType = VectorValues.VectorIndexType.NONE;
   private Map<String, String> attributes;
 
   /**
@@ -368,6 +369,12 @@ public class FieldType implements IndexableFieldType  {
     this.vectorDistFunc = distFunc;
   }
 
+  public void setVecDimsAndDistFuncAndIndexType(int dims, VectorValues.DistanceFunction distFunc,
+                                                VectorValues.VectorIndexType indexType) {
+    this.setVectorDimensionsAndDistanceFunction(dims, distFunc);
+    this.vectorIndexType = indexType;
+  }
+
   @Override
   public int vectorNumDimensions() {
     return vectorNumDimensions;
@@ -376,6 +383,16 @@ public class FieldType implements IndexableFieldType  {
   @Override
   public VectorValues.DistanceFunction vectorDistFunc() {
     return vectorDistFunc;
+  }
+
+  /**
+   * The {@link VectorValues.VectorIndexType} of the field's vector index type
+   *
+   * @return
+   */
+  @Override
+  public VectorValues.VectorIndexType vectorIndexType() {
+    return vectorIndexType;
   }
 
   /**

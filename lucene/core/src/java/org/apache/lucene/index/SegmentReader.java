@@ -27,6 +27,7 @@ import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.DocValuesProducer;
 import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.KnnGraphReader;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsReader;
@@ -264,6 +265,16 @@ public final class SegmentReader extends CodecReader {
   @Override
   public KnnGraphReader getKnnGraphReader() {
     return core.knnGraphReader;
+  }
+
+  /**
+   * Expert: retrieve underlying IvfFlatIndexReader
+   *
+   * @lucene.internal
+   */
+  @Override
+  public IvfFlatIndexReader getIvfFlatIndexReader() {
+    return core.ivfFlatIndexReader;
   }
 
   @Override

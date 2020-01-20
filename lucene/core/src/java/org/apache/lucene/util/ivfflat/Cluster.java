@@ -15,8 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.lucene.util.cluster;
+package org.apache.lucene.util.ivfflat;
 
-public interface DistanceMeasure {
-  double compute(float[] v1, float[] v2);
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * {@code Cluster} describes a cluster of points that belongs to a certain central point.
+ */
+public class Cluster<T extends Clusterable> {
+  private final ArrayList<T> points = new ArrayList<>();
+
+  public void addPoint(T point) {
+    this.points.add(point);
+  }
+
+  public List<T> getPoints() {
+    return this.points;
+  }
 }

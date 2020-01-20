@@ -18,36 +18,67 @@
 package org.apache.lucene.search;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.VectorValues;
-import org.apache.lucene.util.hnsw.HNSWGraphReader;
-import org.apache.lucene.util.hnsw.Neighbor;
-import org.apache.lucene.util.hnsw.Neighbors;
+import org.apache.lucene.util.ivfflat.ImmutableUnClusterableVector;
+import org.apache.lucene.util.ivfflat.IvfFlatCacheReader;
+import org.apache.lucene.util.ivfflat.SortedImmutableVectorValue;
 
-/**
- * {@code KnnExactDeletionFilter} applies in-set (i.e. the query vector is exactly in the index)
- * deletion strategy to filter all unmatched results searched by {@link KnnExactDeletionCondition},
- * and deletes at most ef*segmentCnt vectors that are the same to the specified queryVector.
- */
-public class KnnExactDeletionFilter extends KnnScoreWeight {
-  KnnExactDeletionFilter(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int ef) {
-    super(query, score, scoreMode, field, queryVector, ef);
+public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
+  private final String field;
+
+  private final ScoreMode scoreMode;
+
+  private final float[] queryVector;
+
+  private final int ef;
+
+  private final int numCentroids;
+
+  public KnnIvfFlatScoreWeight(Query query, float score, String field, ScoreMode scoreMode, float[] queryVector, int ef, int numCentroids) {
+    super(query, score);
+    this.field = field;
+    this.scoreMode = scoreMode;
+    this.queryVector = queryVector;
+    this.ef = ef;
+    this.numCentroids = numCentroids;
+  }
+
+  /**
+   * Returns a {@link Scorer} which can iterate in order over all matching
+   * documents and assign them a score.
+   * <p>
+   * <b>NOTE:</b> null can be returned if no documents will be scored by this
+   * query.
+   * <p>
+   * <b>NOTE</b>: The returned {@link Scorer} does not have
+   * {@link LeafReader#getLiveDocs()} applied, they need to be checked on top.
+   *
+   * @param context the {@link LeafReaderContext} for which to return the {@link Scorer}.
+   * @return a {@link Scorer} which scores documents in/out-of order.
+   * @throws IOException if there is a low-level I/O error
+   */
+  @Override
+  public Scorer scorer(LeafReaderContext context) throws IOException {
+    ScorerSupplier supplier = scorerSupplier(context);
+    if (supplier == null) {
+      return null;
+    }
+    return supplier.get(Long.MAX_VALUE);
   }
 
   @Override
   public ScorerSupplier scorerSupplier(LeafReaderContext context) throws IOException {
-    FieldInfo fi = context.reader().getFieldInfos().fieldInfo(field);
+    final FieldInfo fi = context.reader().getFieldInfos().fieldInfo(field);
     int numDimensions = fi.getVectorNumDimensions();
     if (numDimensions != queryVector.length) {
-      throw new IllegalArgumentException("field=\"" + field + "\" was indexed with dimensions=" + numDimensions +
-          "; this is incompatible with query dimensions=" + queryVector.length);
+      throw new IllegalArgumentException("field=\"" + field + "\" was indexed with dimensions=" + numDimensions + "; this is incompatible with query dimensions=" + queryVector.length);
     }
 
-    final HNSWGraphReader hnswReader = new HNSWGraphReader(field, context);
+    final IvfFlatCacheReader ivfFlatCacheReader = new IvfFlatCacheReader(field, context);
     final VectorValues vectorValues = context.reader().getVectorValues(field);
     if (vectorValues == null) {
       // No docs in this segment/field indexed any vector values
@@ -58,32 +89,11 @@ public class KnnExactDeletionFilter extends KnnScoreWeight {
     return new ScorerSupplier() {
       @Override
       public Scorer get(long leadCost) throws IOException {
-        final Neighbors neighbors = hnswReader.searchNeighbors(queryVector, ef, vectorValues);
-        visitedCounter.addAndGet(hnswReader.getVisitedCount());
-
-        if (neighbors.size() > 0) {
-          Neighbor top = neighbors.top();
-          if (top.distance() > 0) {
-            neighbors.clear();
-          } else {
-            final List<Neighbor> toDeleteNeighbors = new ArrayList<>(neighbors.size());
-            for (Neighbor neighbor : neighbors) {
-              if (neighbor.distance() == 0) {
-                toDeleteNeighbors.add(neighbor);
-              } else {
-                break;
-              }
-            }
-
-            neighbors.clear();
-
-            toDeleteNeighbors.forEach(neighbors::add);
-          }
-        }
-
+        SortedImmutableVectorValue neighbors = ivfFlatCacheReader.search(queryVector, ef, numCentroids, vectorValues);
         return new Scorer(weight) {
 
           int doc = -1;
+          float score = 0.0f;
           int size = neighbors.size();
           int offset = 0;
 
@@ -96,25 +106,28 @@ public class KnnExactDeletionFilter extends KnnScoreWeight {
               }
 
               @Override
-              public int nextDoc() {
+              public int nextDoc() throws IOException {
                 return advance(offset);
               }
 
               @Override
-              public int advance(int target) {
+              public int advance(int target) throws IOException {
                 if (target > size || neighbors.size() == 0) {
                   doc = NO_MORE_DOCS;
+                  score = 0.0f;
                 } else {
                   while (offset < target) {
                     neighbors.pop();
                     offset++;
                   }
-                  Neighbor next = neighbors.pop();
+                  ImmutableUnClusterableVector next = neighbors.pop();
                   offset++;
                   if (next == null) {
                     doc = NO_MORE_DOCS;
+                    score = 0.0f;
                   } else {
                     doc = next.docId();
+                    score = 1.0F / (next.distance() / numDimensions + 0.01F);
                   }
                 }
                 return doc;
@@ -128,13 +141,13 @@ public class KnnExactDeletionFilter extends KnnScoreWeight {
           }
 
           @Override
-          public float getMaxScore(int upTo) {
+          public float getMaxScore(int upTo) throws IOException {
             return Float.POSITIVE_INFINITY;
           }
 
           @Override
-          public float score() {
-            return 0.0f;
+          public float score() throws IOException {
+            return score;
           }
 
           @Override
@@ -149,5 +162,14 @@ public class KnnExactDeletionFilter extends KnnScoreWeight {
         return ef;
       }
     };
+  }
+
+  /**
+   * @param ctx
+   * @return {@code true} if the object can be cached against a given leaf
+   */
+  @Override
+  public boolean isCacheable(LeafReaderContext ctx) {
+    return true;
   }
 }

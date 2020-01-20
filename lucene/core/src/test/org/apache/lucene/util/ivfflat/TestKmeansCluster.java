@@ -18,13 +18,13 @@
 package org.apache.lucene.util.ivfflat;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.LuceneTestCase;
-import org.apache.lucene.util.cluster.Centroid;
-import org.apache.lucene.util.cluster.KMeansCluster;
 
 public class TestKmeansCluster extends LuceneTestCase {
   private Random random = new Random();
@@ -34,7 +34,7 @@ public class TestKmeansCluster extends LuceneTestCase {
   private static final int dataSize = 10000;
 
   public void testCluster() {
-    final List<float[]> vectors = randomVectors(dims, dataSize);
+    final List<float[]> vectors = randomVectors();
     assertEquals(dataSize, vectors.size());
 
     final List<ImmutableClusterableVector> clusterableVectors = new ArrayList<>(dataSize);
@@ -43,29 +43,57 @@ public class TestKmeansCluster extends LuceneTestCase {
       clusterableVectors.add(new ImmutableClusterableVector(counter++, vector));
     }
 
-    KMeansCluster<ImmutableClusterableVector> cluster = new KMeansCluster<>(VectorValues.DistanceFunction.EUCLIDEAN);
+    final KMeansCluster<ImmutableClusterableVector> cluster = new KMeansCluster<>(VectorValues.DistanceFunction.EUCLIDEAN);
 
     long startTime = System.currentTimeMillis();
     List<Centroid<ImmutableClusterableVector>> centroids = cluster.cluster(clusterableVectors);
     long costTime = System.currentTimeMillis() - startTime;
 
-    System.out.println("cluster cost -> " + costTime + " msec");
+    System.out.println("clustering cost -> " + costTime + " msec, centroid size -> " + cluster.getK());
 
     assertEquals(cluster.getK(), centroids.size());
+
+    int totalCnts = 0;
+    for (Centroid<ImmutableClusterableVector> centroid : centroids) {
+      totalCnts += centroid.getPoints().size();
+      for (ImmutableClusterableVector vector : centroid.getPoints()) {
+
+        List<Centroid<ImmutableClusterableVector>> results = centroids.stream().sorted((o1, o2) -> {
+          double left = cluster.distance(o1.getCenter(), vector);
+          double right = cluster.distance(o2.getCenter(), vector);
+
+          if (left < right) {
+            return -1;
+          } else if (right < left) {
+            return 1;
+          }
+
+          return 0;
+        }).limit(1).collect(Collectors.toList());
+
+        assertEquals(1, results.size());
+
+        assertEquals(centroid.getCenter().docId(), results.get(0).getCenter().docId());
+
+        assertEquals(0, Arrays.compare(centroid.getCenter().getPoint(), results.get(0).getCenter().getPoint()));
+      }
+    }
+
+    assertEquals(dataSize, totalCnts);
   }
 
-  private List<float[]> randomVectors(int dims, int totalCnt) {
-    List<float[]> vectors = new ArrayList<>(totalCnt);
-    for (int i = 0; i < totalCnt; ++i) {
-      vectors.add(randomVector(dims));
+  private List<float[]> randomVectors() {
+    List<float[]> vectors = new ArrayList<>(TestKmeansCluster.dataSize);
+    for (int i = 0; i < TestKmeansCluster.dataSize; ++i) {
+      vectors.add(randomVector());
     }
 
     return vectors;
   }
 
-  private float[] randomVector(int dims) {
-    float[] vector = new float[dims];
-    for(int i =0; i < dims; i++) {
+  private float[] randomVector() {
+    float[] vector = new float[TestKmeansCluster.dims];
+    for(int i = 0; i < TestKmeansCluster.dims; i++) {
       vector[i] = random.nextFloat();
     }
 

@@ -22,9 +22,10 @@ import org.apache.lucene.index.VectorValues;
 /**
  * Per-document vector value; {@code float} array with indexed knn graph for fast approximate nearest neighbor search.
  */
-public class VectorField extends Field {
+public final class VectorField extends Field {
 
-  private static FieldType getType(int dimensions, VectorValues.DistanceFunction distFunc) {
+  private static FieldType getType(int dimensions, VectorValues.DistanceFunction distFunc,
+                                   VectorValues.VectorIndexType indexType) {
     if (dimensions == 0) {
       throw new IllegalArgumentException("VectorField does not support 0 dimensions");
     }
@@ -32,13 +33,18 @@ public class VectorField extends Field {
       throw new IllegalArgumentException("VectorField does not support greater than " + VectorValues.MAX_DIMENSIONS + " dimensions");
     }
     FieldType type = new FieldType();
-    type.setVectorDimensionsAndDistanceFunction(dimensions, distFunc);
+    type.setVecDimsAndDistFuncAndIndexType(dimensions, distFunc, indexType);
     type.freeze();
     return type;
   }
 
   public VectorField(String name, float[] vector, VectorValues.DistanceFunction distFunc) {
-    super(name, VectorValues.encode(vector), getType(vector.length, distFunc));
+    this(name, vector, distFunc, VectorValues.VectorIndexType.HNSW);
+  }
+
+  public VectorField(String name, float[] vector, VectorValues.DistanceFunction distFunc,
+                     VectorValues.VectorIndexType indexType) {
+    super(name, VectorValues.encode(vector), getType(vector.length, distFunc, indexType));
   }
 
   /** Changes the value of this field */

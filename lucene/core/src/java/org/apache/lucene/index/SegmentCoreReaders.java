@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.KnnGraphReader;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsReader;
@@ -63,6 +64,7 @@ final class SegmentCoreReaders {
   final TermVectorsReader termVectorsReaderOrig;
   final PointsReader pointsReader;
   final KnnGraphReader knnGraphReader;
+  final IvfFlatIndexReader ivfFlatIndexReader;
   final Directory cfsReader;
   final String segment;
   /** 
@@ -140,10 +142,15 @@ final class SegmentCoreReaders {
         pointsReader = null;
       }
 
-      if (coreFieldInfos.hasVectorValues()) {
+      if (coreFieldInfos.hasGraphAndVectorValues()) {
         knnGraphReader = codec.knnGraphFormat().fieldsReader(segmentReadState);
       } else {
         knnGraphReader = null;
+      }
+      if (coreFieldInfos.hasIvfFlatAndVectorValues()) {
+        ivfFlatIndexReader = codec.ivfFlatIndexFormat().fieldsReader(segmentReadState);
+      } else {
+        ivfFlatIndexReader = null;
       }
 
       success = true;

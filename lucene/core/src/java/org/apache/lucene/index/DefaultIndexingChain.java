@@ -31,6 +31,8 @@ import java.util.Set;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.codecs.DocValuesConsumer;
 import org.apache.lucene.codecs.DocValuesFormat;
+import org.apache.lucene.codecs.IvfFlatIndexFormat;
+import org.apache.lucene.codecs.IvfFlatIndexWriter;
 import org.apache.lucene.codecs.KnnGraphFormat;
 import org.apache.lucene.codecs.KnnGraphWriter;
 import org.apache.lucene.codecs.NormsConsumer;
@@ -306,27 +308,42 @@ final class DefaultIndexingChain extends DocConsumer {
   private void writeVectors(SegmentWriteState state, Sorter.DocMap sortMap) throws IOException {
     //PointsWriter pointsWriter = null;
     KnnGraphWriter knnGraphWriter = null;
+    IvfFlatIndexWriter ivfFlatIndexWriter = null;
     boolean success = false;
     try {
       for (int i = 0; i<fieldHash.length; i++) {
         PerField perField = fieldHash[i];
         while (perField != null) {
-          if (perField.knnGraphValuesWriter != null) {
+          if (perField.knnGraphValuesWriter != null || perField.ivfFlatWriter != null) {
             if (perField.fieldInfo.getVectorNumDimensions() == 0) {
               // BUG
               throw new AssertionError("segment=" + state.segmentInfo + ": field=\"" + perField.fieldInfo.name + "\" has no vectors but wrote them");
             }
-            if (knnGraphWriter == null) {
-              // lazy init
-              KnnGraphFormat fmt = state.segmentInfo.getCodec().knnGraphFormat();
-              if (fmt == null) {
-                throw new IllegalStateException("field=\"" + perField.fieldInfo.name + "\" was indexed as vectors but codec does not support vectors");
-              }
-              knnGraphWriter = fmt.fieldsWriter(state);
-            }
 
-            perField.knnGraphValuesWriter.flush(sortMap, knnGraphWriter);
-            perField.knnGraphValuesWriter = null;
+            if (perField.fieldInfo.getVectorIndexType() == VectorValues.VectorIndexType.HNSW) {
+              if (knnGraphWriter == null) {
+                // lazy init
+                KnnGraphFormat fmt = state.segmentInfo.getCodec().knnGraphFormat();
+                if (fmt == null) {
+                  throw new IllegalStateException("field=\"" + perField.fieldInfo.name + "\" was indexed as vectors but codec does not support vectors");
+                }
+                knnGraphWriter = fmt.fieldsWriter(state);
+              }
+
+              perField.knnGraphValuesWriter.flush(sortMap, knnGraphWriter);
+              perField.knnGraphValuesWriter = null;
+            } else if (perField.fieldInfo.getVectorIndexType() == VectorValues.VectorIndexType.IVFFLAT) {
+              if (ivfFlatIndexWriter == null) {
+                IvfFlatIndexFormat fmt = state.segmentInfo.getCodec().ivfFlatIndexFormat();
+                if (fmt == null) {
+                  throw new IllegalStateException("field=\"" + perField.fieldInfo.name + "\" was indexed as vectors but codec does not support vectors");
+                }
+                ivfFlatIndexWriter = fmt.fieldsWriter(state);
+              }
+
+              perField.ivfFlatWriter.flush(sortMap, ivfFlatIndexWriter);
+              perField.ivfFlatWriter = null;
+            }
           } else if (perField.fieldInfo.getVectorNumDimensions() != 0) {
             // BUG
             throw new AssertionError("segment=" + state.segmentInfo + ": field=\"" + perField.fieldInfo.name + "\" has vectors but did not write them");
@@ -337,12 +354,15 @@ final class DefaultIndexingChain extends DocConsumer {
       if (knnGraphWriter != null) {
         knnGraphWriter.finish();
       }
+      if (ivfFlatIndexWriter != null) {
+        ivfFlatIndexWriter.finish();
+      }
       success = true;
     } finally {
       if (success) {
-        IOUtils.close(knnGraphWriter);
+        IOUtils.close(knnGraphWriter, ivfFlatIndexWriter);
       } else {
-        IOUtils.closeWhileHandlingException(knnGraphWriter);
+        IOUtils.closeWhileHandlingException(knnGraphWriter, ivfFlatIndexWriter);
       }
     }
   }
@@ -697,17 +717,27 @@ final class DefaultIndexingChain extends DocConsumer {
     int numDimensions = field.fieldType().vectorNumDimensions();
     VectorValues.DistanceFunction distFunc = field.fieldType().vectorDistFunc();
 
+    VectorValues.VectorIndexType vectorIndexType = field.fieldType().vectorIndexType();
+
     // Record dimensions and distance function for this field; this setter will throw IllegalArgExc if
     // the dimensions or distance function were already set to something different:
     if (fp.fieldInfo.getVectorNumDimensions() == 0) {
       fieldInfos.globalFieldNumbers.setVectorDimensionsAndDistanceFunction(fp.fieldInfo.number, fp.fieldInfo.name, numDimensions, distFunc);
     }
-    fp.fieldInfo.setVectorDimensionsAndDistanceFunction(numDimensions, distFunc);
 
-    if (fp.knnGraphValuesWriter == null) {
-      fp.knnGraphValuesWriter = new KnnGraphValuesWriter(fp.fieldInfo, docWriter.bytesUsed);
+    fp.fieldInfo.setVecDimsAndDistFuncAndIndexType(numDimensions, distFunc, vectorIndexType);
+
+    if (vectorIndexType == VectorValues.VectorIndexType.HNSW) {
+      if (fp.knnGraphValuesWriter == null) {
+        fp.knnGraphValuesWriter = new KnnGraphValuesWriter(fp.fieldInfo, docWriter.bytesUsed);
+      }
+      fp.knnGraphValuesWriter.addValue(docState.docID, field.binaryValue());
+    } else if (vectorIndexType == VectorValues.VectorIndexType.IVFFLAT) {
+      if (fp.ivfFlatWriter == null) {
+        fp.ivfFlatWriter = new IvfFlatWriter(fp.fieldInfo, docWriter.bytesUsed);
+      }
+      fp.ivfFlatWriter.addValue(docState.docID, field.binaryValue());
     }
-    fp.knnGraphValuesWriter.addValue(docState.docID, field.binaryValue());
   }
 
   /** Returns a previously created {@link PerField}, or null
@@ -796,8 +826,11 @@ final class DefaultIndexingChain extends DocConsumer {
     // Non-null if this field ever had points in this segment:
     PointValuesWriter pointValuesWriter;
 
-    // Non-null if this field ever had vector values in this segment:
+    // Non-null if this field ever had vector values and the index type is hnsw in this segment:
     KnnGraphValuesWriter knnGraphValuesWriter;
+
+    // Non-null if this field ever had vector values and the index type is ivfflat in this segment
+    IvfFlatWriter ivfFlatWriter;
 
     /** We use this to know when a PerField is seen for the
      *  first time in the current document. */

@@ -128,7 +128,7 @@ public class KnnGraphValuesWriter implements Accountable {
     return bytesUsed;
   }
 
-  private static class BufferedVectorValues extends VectorValues {
+  static class BufferedVectorValues extends VectorValues {
 
     final DocIdSetIterator docsWithField;
     final float[][] vectorsArray;

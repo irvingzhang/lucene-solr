@@ -348,6 +348,11 @@ public abstract class FilterLeafReader extends LeafReader {
   }
 
   @Override
+  public IvfFlatValues getIvfFlatValues(final String field) throws IOException {
+    return in.getIvfFlatValues(field);
+  }
+
+  @Override
   public int numDocs() {
     // Don't call ensureOpen() here (it could affect performance)
     return in.numDocs();

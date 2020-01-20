@@ -198,6 +198,7 @@ public class STBlockReaderTest extends LuceneTestCase {
         0,
         0,
         VectorValues.DistanceFunction.NONE,
+        VectorValues.VectorIndexType.NONE,
         false
     );
   }
