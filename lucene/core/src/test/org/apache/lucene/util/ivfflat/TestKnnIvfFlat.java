@@ -19,6 +19,7 @@ package org.apache.lucene.util.ivfflat;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -124,14 +125,14 @@ public class TestKnnIvfFlat extends LuceneTestCase {
         LeafReader reader = ctx.reader();
         VectorValues vectorValues = reader.getVectorValues(KNN_IVF_FLAT_FIELD);
         IvfFlatValues ivfFlatValues = reader.getIvfFlatValues(KNN_IVF_FLAT_FIELD);
-        assertTrue((vectorValues == null) == (ivfFlatValues == null));
+        assertEquals((vectorValues == null), (ivfFlatValues == null));
         if (vectorValues == null) {
           continue;
         }
 
         boolean hasVector = false;
         for (int i = 0; i < reader.maxDoc(); i++) {
-          int id = Integer.parseInt(reader.document(i).get("id"));
+          int id = Integer.parseInt(Objects.requireNonNull(reader.document(i).get("id")));
           if (values[id] == null) {
             ++totalIvfFlatDocs;
             // documents without IvfFlatValues have no vectors or neighbors
@@ -143,6 +144,8 @@ public class TestKnnIvfFlat extends LuceneTestCase {
 
         if (hasVector) {
           int[] centroids = ivfFlatValues.getCentroids();
+          assertNotNull(centroids);
+
           for (int docId : centroids) {
             IntsRef ivfLink = ivfFlatValues.getIvfLink(docId);
             totalIvfFlatDocs += ivfLink.length;
@@ -191,9 +194,6 @@ public class TestKnnIvfFlat extends LuceneTestCase {
       long startTime = System.currentTimeMillis();
       TopDocs result = searcher.search(query, expectSize);
       long costTime = System.currentTimeMillis() - startTime;
-
-      /*System.out.println("Recall vector " + Arrays.toString(value) + " cost " + costTime + " msec, result size -> "
-          + result.scoreDocs.length + ", details -> " + Arrays.toString(result.scoreDocs));*/
 
       int totalRecallCnt = 0, exactRecallCnt = 0;
       for (LeafReaderContext ctx : reader.leaves()) {

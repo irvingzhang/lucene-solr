@@ -42,7 +42,7 @@ public abstract class IvfFlatValues {
   public abstract IntsRef getIvfLink(int centroid);
 
   /** Empty graph value */
-  public static IvfFlatValues EMPTY = new IvfFlatValues() {
+  public static final IvfFlatValues EMPTY = new IvfFlatValues() {
     /**
      * Returns the center points of the ivfflat index.
      *
@@ -50,7 +50,7 @@ public abstract class IvfFlatValues {
      */
     @Override
     public int[] getCentroids() {
-      return new int[0];
+      return IntsRef.EMPTY_INTS;
     }
 
     /**
