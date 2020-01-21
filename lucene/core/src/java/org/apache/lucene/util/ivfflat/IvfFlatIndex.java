@@ -64,7 +64,7 @@ public class IvfFlatIndex implements Accountable {
 
     ensureCentroids(vectorValues);
 
-    /// Phase one -> search top center points and their invert index links
+    /// Phase one -> search top centroids
     final List<ImmutableUnClusterableVector> immutableUnClusterableVectors = new ArrayList<>(clusteredPoints.size());
     clusteredPoints.forEach(i -> immutableUnClusterableVectors.add(new ImmutableUnClusterableVector(
         i.getCenter(), this.distanceMeasure.compute(i.getCentroidValue(), query), i.getPoints())));
@@ -84,7 +84,7 @@ public class IvfFlatIndex implements Accountable {
     SortedImmutableVectorValue results = new SortedImmutableVectorValue(ef, query, this.distanceMeasure);
     clusters.forEach(results::insertWithOverflow);
 
-    /// Phase two -> search topK center points and their inverted index links
+    /// Phase two -> search topK center points from top centroids and their clusters
     IOException[] exceptions = new IOException[]{null};
     clusters.forEach(cluster -> cluster.points().forEach(docId -> {
       if (docId != cluster.docId()) {
