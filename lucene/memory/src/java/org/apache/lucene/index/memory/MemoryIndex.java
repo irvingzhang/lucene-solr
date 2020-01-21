@@ -1256,7 +1256,7 @@ public class MemoryIndex {
     @Override
     public IvfFlatValues getIvfFlatValues(String field) throws IOException {
       /// TODO
-      return null;
+      return IvfFlatValues.EMPTY;
     }
 
     @Override

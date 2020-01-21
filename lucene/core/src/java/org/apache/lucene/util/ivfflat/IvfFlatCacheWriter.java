@@ -22,7 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Accountable;
@@ -70,15 +70,20 @@ public final class IvfFlatCacheWriter implements Accountable {
                                                         immutableClusterableVectors) throws NoSuchElementException {
     /// to accelerate training on large data set, select partial points after shuffling for k-means clustering
     if (immutableClusterableVectors.size() > KMeansCluster.MAX_SUGGEST_TRAINING_POINTS) {
+      /// try to sample at least 50% points
+      int trainingSize = Math.max((immutableClusterableVectors.size() >> 1),
+          KMeansCluster.MAX_SUGGEST_TRAINING_POINTS);
+
+      trainingSize = Math.min(trainingSize, KMeansCluster.MAX_ALLOW_TRAINING_POINTS);
+
       /// shuffle the whole collection
       Collections.shuffle(immutableClusterableVectors);
 
       /// select a subset for training
-      final List<ImmutableClusterableVector> trainingSubset = immutableClusterableVectors.subList(0,
-          KMeansCluster.MAX_SUGGEST_TRAINING_POINTS);
+      final List<ImmutableClusterableVector> trainingSubset = immutableClusterableVectors.subList(0, trainingSize);
 
       final List<ImmutableClusterableVector> untrainedSubset = immutableClusterableVectors.subList(
-          KMeansCluster.MAX_SUGGEST_TRAINING_POINTS, immutableClusterableVectors.size());
+          trainingSize, immutableClusterableVectors.size());
 
       /// training
       final List<Centroid<ImmutableClusterableVector>> centroidList = clusterer.cluster(trainingSubset,
@@ -86,9 +91,9 @@ public final class IvfFlatCacheWriter implements Accountable {
 
       /// insert each untrained point to its nearest centroid
       untrainedSubset.forEach(point -> {
-        final List<Centroid<ImmutableClusterableVector>> nearestCentroidList = centroidList.stream().sorted((o1, o2) -> {
-          float lhs = clusterer.distanceMeasure.compute(o1.getCenter().getPoint(), point.getPoint());
-          float rhs = clusterer.distanceMeasure.compute(o2.getCenter().getPoint(), point.getPoint());
+        final Optional<Centroid<ImmutableClusterableVector>> nearestCentroid = centroidList.stream().min((o1, o2) -> {
+          float lhs = clusterer.getDistanceMeasure().compute(o1.getCenter().getPoint(), point.getPoint());
+          float rhs = clusterer.getDistanceMeasure().compute(o2.getCenter().getPoint(), point.getPoint());
 
           if (lhs < rhs) {
             return -1;
@@ -97,14 +102,10 @@ public final class IvfFlatCacheWriter implements Accountable {
           }
 
           return 0;
-        }).limit(1).collect(Collectors.toList());
+        });
 
-        if (!nearestCentroidList.isEmpty()) {
-          nearestCentroidList.get(0).addPoint(point);
-        } else {
-          /// must be bug
-          throw new NoSuchElementException(point.toString() + " has no centroid!");
-        }
+        assert nearestCentroid.isPresent();
+        nearestCentroid.get().addPoint(point);
       });
 
       return IvfFlatIndex.ClusteredPoints.convert(centroidList);

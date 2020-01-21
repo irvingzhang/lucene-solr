@@ -32,9 +32,11 @@ import org.apache.lucene.index.VectorValues;
  */
 public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   /** Maximum suggested point number for training, avoid memory too large and training last too long */
-  public static final int MAX_SUGGEST_TRAINING_POINTS = 40000;
+  public static final int MAX_SUGGEST_TRAINING_POINTS = 200000;
 
-  private static final int MAX_KMEANS_ITERATIONS = 50;
+  public static final int MAX_ALLOW_TRAINING_POINTS = MAX_SUGGEST_TRAINING_POINTS * 2;
+
+  private static final int MAX_KMEANS_ITERATIONS = 10;
 
   private static final int DEFAULT_KMEANS_K = 200;
 
@@ -42,9 +44,9 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
 
   private int k;
 
-  private Random random;
+  private final Random random;
 
-  DistanceMeasure distanceMeasure;
+  private final DistanceMeasure distanceMeasure;
 
   public KMeansCluster(VectorValues.DistanceFunction distFunc) {
     this(MAX_KMEANS_ITERATIONS, DEFAULT_KMEANS_K, distFunc);
@@ -102,7 +104,6 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
            newClusters.add(new Centroid<>(newCenter))) {
         final Centroid<T> cluster = i$.next();
         if (cluster.getPoints().isEmpty()) {
-          ///newCenter = this.getPointFromLargestNumberCluster(clusters);///.getFarthestPoint(clusters);
           newCenter = this.getFarthestPoint(clusters);
           emptyCluster = true;
         } else {
@@ -209,7 +210,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
         ++assignedDifferently;
       }
 
-      Centroid<T> cluster = clusters.get(clusterIndex);
+      final Centroid<T> cluster = clusters.get(clusterIndex);
       cluster.addPoint(p);
     }
 
@@ -282,5 +283,9 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
 
   public int getK() {
     return k;
+  }
+
+  public DistanceMeasure getDistanceMeasure() {
+    return distanceMeasure;
   }
 }

@@ -92,7 +92,7 @@ public class TestKnnIvfFlat extends LuceneTestCase {
     float[][] randomVectors = randomVectors(numDocs, dimension);
 
     try (Directory dir = newDirectory(); IndexWriter iw = new IndexWriter(
-        dir, newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
+        dir, newIndexWriterConfig(null).setMaxBufferedDocs(1000000).setCodec(Codec.forName("Lucene90")))) {
       for (int i = 0; i < numDocs; ++i) {
         add(iw, i, randomVectors[i]);
       }
@@ -194,6 +194,8 @@ public class TestKnnIvfFlat extends LuceneTestCase {
       long startTime = System.currentTimeMillis();
       TopDocs result = searcher.search(query, expectSize);
       long costTime = System.currentTimeMillis() - startTime;
+
+      assertEquals(expectSize, result.scoreDocs.length);
 
       int totalRecallCnt = 0, exactRecallCnt = 0;
       for (LeafReaderContext ctx : reader.leaves()) {

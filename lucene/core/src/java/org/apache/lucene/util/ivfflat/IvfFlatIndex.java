@@ -70,8 +70,7 @@ public class IvfFlatIndex implements Accountable {
         i.getCenter(), this.distanceMeasure.compute(i.getCentroidValue(), query), i.getPoints())));
     List<ImmutableUnClusterableVector> clusters = immutableUnClusterableVectors;
     if (clusteredPoints.size() > centroids) {
-      clusters = immutableUnClusterableVectors.stream()
-          .sorted((o1, o2) -> {
+      clusters = immutableUnClusterableVectors.stream().sorted((o1, o2) -> {
             if (o1.distance() < o2.distance()) {
               return -1;
             } else if (o2.distance() < o1.distance()) {
@@ -169,15 +168,13 @@ public class IvfFlatIndex implements Accountable {
     }
 
     static List<ClusteredPoints> convert(List<Centroid<ImmutableClusterableVector>> collection) {
-      List<ClusteredPoints> results = new ArrayList<>(collection.size());
-      collection.forEach(clusterableCentroid -> {
-        List<Integer> clusterList = new ArrayList<>(clusterableCentroid.getPoints().size());
-        clusterableCentroid.getPoints().forEach(point -> clusterList.add(point.docId()));
-        results.add(new ClusteredPoints(clusterableCentroid.getCenter().docId(),
-            clusterableCentroid.getCenter().getPoint(), clusterList));
-      });
+      return collection.stream().map(centroid -> {
+        final List<Integer> clusterList = new ArrayList<>(centroid.getPoints().size());
+        centroid.getPoints().stream().map(Clusterable::docId).forEach(clusterList::add);
+        return new ClusteredPoints(centroid.getCenter().docId(),
+            centroid.getCenter().getPoint(), clusterList);
 
-      return results;
+      }).collect(Collectors.toList());
     }
 
     /**

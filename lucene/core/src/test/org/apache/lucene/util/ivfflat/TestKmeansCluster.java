@@ -31,7 +31,7 @@ public class TestKmeansCluster extends LuceneTestCase {
 
   private static final int dims = 256;
 
-  private static final int dataSize = 10000;
+  private static final int dataSize = 40000;
 
   public void testCluster() {
     final List<float[]> vectors = randomVectors();
@@ -46,10 +46,11 @@ public class TestKmeansCluster extends LuceneTestCase {
     final KMeansCluster<ImmutableClusterableVector> cluster = new KMeansCluster<>(VectorValues.DistanceFunction.EUCLIDEAN);
 
     long startTime = System.currentTimeMillis();
-    List<Centroid<ImmutableClusterableVector>> centroids = cluster.cluster(clusterableVectors);
+    final List<Centroid<ImmutableClusterableVector>> centroids = cluster.cluster(clusterableVectors);
     long costTime = System.currentTimeMillis() - startTime;
 
-    System.out.println("clustering cost -> " + costTime + " msec, centroid size -> " + cluster.getK());
+    System.out.println("Total points -> " + clusterableVectors.size() + ", dimension -> " + dims + ", clustering cost -> " +
+        costTime + " msec, centroid size -> " + cluster.getK());
 
     assertEquals(cluster.getK(), centroids.size());
 

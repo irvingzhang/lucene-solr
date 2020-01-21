@@ -56,20 +56,20 @@ public final class DistanceFactory {
         return (v1, v2) -> {
           assert v1.length == v2.length;
 
-          double sum = 0.0D, squareSum1 = 0.0D, squareSum2 = 0.0D;
+          float sum = 0.0F, squareSum1 = 0.0F, squareSum2 = 0.0F;
           for (int i = 0; i < v1.length; i++) {
             sum += v1[i] * v2[i];
             squareSum1 += v1[i] * v1[i];
             squareSum2 += v2[i] * v2[i];
           }
-          return (float) (1.0F - sum / (Math.sqrt(squareSum1) * Math.sqrt(squareSum2)));
+          return (float) (sum / (Math.sqrt(squareSum1) * Math.sqrt(squareSum2)));
         };
 
       case NONE:
-        return (v1, v2) -> 0F;
+        return (v1, v2) -> 0.0F;
 
       default:
-        throw new UnsupportedOperationException("Clustering using unsupported distance function " + distFunc);
+        throw new UnsupportedOperationException("unsupported distance measure type: " + distFunc);
     }
   }
 }

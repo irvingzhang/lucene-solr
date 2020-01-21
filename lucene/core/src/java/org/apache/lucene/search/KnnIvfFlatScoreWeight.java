@@ -129,7 +129,7 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
                   } else {
                     doc = next.docId();
                     if (scoreMode.needsScores()) {
-                      score = 1.0F / (next.distance() / numDimensions + 0.01F);
+                      score = 1.0F / (next.distance() + Float.MIN_NORMAL);
                     }
                   }
                 }
