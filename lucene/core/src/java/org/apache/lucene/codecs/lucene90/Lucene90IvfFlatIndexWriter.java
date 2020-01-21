@@ -173,29 +173,17 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
   @Override
   protected void mergeOneField(FieldInfo fieldInfo, MergeState state) throws IOException {
     int readerLength = state.ivfFlatIndexReaders.length;
-    List<Lucene90KnnGraphWriter.VectorValuesSub> subs = new ArrayList<>(readerLength);
-    int dims = -1;
+    final List<Lucene90KnnGraphWriter.VectorValuesSub> subs = new ArrayList<>(readerLength);
     for (int i = 0; i < readerLength; ++i) {
-      IvfFlatIndexReader ivfFlatIndexReader = state.ivfFlatIndexReaders[i];
+      final IvfFlatIndexReader ivfFlatIndexReader = state.ivfFlatIndexReaders[i];
       if (ivfFlatIndexReader != null) {
-        if (fieldInfo != null && fieldInfo.hasVectorValues()) {
-          int segmentDims = fieldInfo.getVectorNumDimensions();
-          if (dims == -1) {
-            dims = segmentDims;
-          } else {
-            throw new IllegalStateException("Varying dimensions for vector-valued field " + fieldInfo.name
-                + ": " + dims + "!=" + segmentDims);
-          }
-
-          VectorValues values = ivfFlatIndexReader.getVectorValues(fieldInfo.name);
-          subs.add(new Lucene90KnnGraphWriter.VectorValuesSub(i, state.docMaps[i], values));
-        }
+        subs.add(new Lucene90KnnGraphWriter.VectorValuesSub(i, state.docMaps[i],
+            ivfFlatIndexReader.getVectorValues(fieldInfo.name)));
       }
     }
 
-    IvfFlatWriter ivfFlatWriter = new IvfFlatWriter(fieldInfo, Counter.newCounter());
-    for (int i = 0; i < subs.size(); ++i) {
-      Lucene90KnnGraphWriter.VectorValuesSub sub = subs.get(i);
+    final IvfFlatWriter ivfFlatWriter = new IvfFlatWriter(fieldInfo, Counter.newCounter());
+    for (Lucene90KnnGraphWriter.VectorValuesSub sub : subs) {
       MergeState.DocMap docMap = state.docMaps[sub.segmentIndex];
       int docId;
       while ((docId = sub.nextDoc()) != NO_MORE_DOCS) {
@@ -204,7 +192,7 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
           continue;
         }
 
-        assert  sub.values.docID() == docId;
+        assert sub.values.docID() == docId;
         ivfFlatWriter.addValue(mappedDocId, sub.values.binaryValue());
       }
     }

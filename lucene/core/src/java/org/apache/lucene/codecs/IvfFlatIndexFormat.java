@@ -109,10 +109,10 @@ public abstract class IvfFlatIndexFormat {
         /**
          * Returns the {@link IvfFlatValues} for the given {@code field}
          *
-         * @param field
+         * @param field field name
          */
         @Override
-        public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+        public IvfFlatValues getIvfFlatValues(String field) {
           return IvfFlatValues.EMPTY;
         }
       };

@@ -21,9 +21,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import org.apache.lucene.util.ivfflat.Cluster;
-import org.apache.lucene.util.ivfflat.Clusterable;
-
 /**
  * {@code Clusterer} is a executor for clustering.
  */
@@ -32,7 +29,7 @@ public interface Clusterer<T extends Clusterable> {
      *
      * @param trainingPoints collection of training points.
      *
-     * @throws NoSuchElementException
+     * @throws NoSuchElementException if the clustering not converge
      */
     List<? extends Cluster<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException;
 
@@ -40,12 +37,12 @@ public interface Clusterer<T extends Clusterable> {
      * Cluster points on the basis of a similarity measure
      *
      * @param trainingPoints collection of training points.
-     * @param expectK specify the parameter for k-means training
-     * @return
-     * @throws NoSuchElementException
+     * @param expectK specify the parameter k for k-means clustering
+     * @return clusters with centroid points
+     * @throws NoSuchElementException if the clustering not converge
      */
     List<? extends Cluster<T>> cluster(Collection<T> trainingPoints, int expectK) throws NoSuchElementException;
 
-    /** Distance by some measure means **/
+    /** Distance by some measure means */
     float distance(Clusterable p1, Clusterable p2);
 }

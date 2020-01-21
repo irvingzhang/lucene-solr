@@ -33,8 +33,8 @@ public class SortedImmutableVectorValue extends PriorityQueue<ImmutableUnCluster
    * Determines the ordering of objects in this priority queue.  Subclasses
    * must define this one method.
    *
-   * @param a
-   * @param b
+   * @param a left hand side object for comparison
+   * @param b right handl side object for comparison
    * @return <code>true</code> iff parameter <tt>a</tt> is less than parameter <tt>b</tt>.
    */
   @Override

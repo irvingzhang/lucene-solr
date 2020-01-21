@@ -69,7 +69,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   public List<Centroid<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException {
     /// adaptively choose the value for k, where k = sqrt(pointSize / 2)
     int size = trainingPoints.size();
-    this.k = (int) Math.sqrt(size);
+    this.k = (int) Math.sqrt(size >> 1);
 
     return this.cluster(trainingPoints, this.k);
   }
@@ -79,8 +79,8 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
    *
    * @param trainingPoints collection of training points.
    * @param expectK        specify the parameter for k-means training
-   * @return
-   * @throws NoSuchElementException
+   * @return the cluster points with corresponding centroid
+   * @throws NoSuchElementException if the clustering not converge
    */
   @Override
   public List<Centroid<T>> cluster(Collection<T> trainingPoints, int expectK) throws NoSuchElementException {
@@ -235,14 +235,12 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
     float maxDistance = Float.MAX_VALUE;
     Cluster<T> selectedCluster = null;
     int selectedPoint = -1;
-    Iterator<Centroid<T>> i$ = clusters.iterator();
 
-    while(i$.hasNext()) {
-      Centroid<T> cluster = i$.next();
+    for (Centroid<T> cluster : clusters) {
       Clusterable center = cluster.getCenter();
       List<T> points = cluster.getPoints();
 
-      for(int i = 0; i < points.size(); ++i) {
+      for (int i = 0; i < points.size(); ++i) {
         float distance = this.distance(points.get(i), center);
         if (distance > maxDistance) {
           maxDistance = distance;
@@ -256,26 +254,6 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
       throw new NoSuchElementException("Cannot find point from largest number cluster");
     } else {
       return selectedCluster.getPoints().remove(selectedPoint);
-    }
-  }
-
-  private Clusterable getPointFromLargestNumberCluster(Collection<? extends Cluster<T>> clusters) throws NoSuchElementException {
-    int maxNumber = 0;
-    Cluster<T> selected = null;
-
-    for (Cluster<T> cluster : clusters) {
-      int number = cluster.getPoints().size();
-      if (number > maxNumber) {
-        maxNumber = number;
-        selected = cluster;
-      }
-    }
-
-    if (selected == null) {
-      throw new NoSuchElementException("Cannot find point from largest number cluster");
-    } else {
-      final List<T> selectedPoints = selected.getPoints();
-      return selectedPoints.remove(this.random.nextInt(selectedPoints.size()));
     }
   }
 

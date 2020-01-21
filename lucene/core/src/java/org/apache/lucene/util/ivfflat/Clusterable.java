@@ -18,12 +18,12 @@
 package org.apache.lucene.util.ivfflat;
 
 /**
- * Any class that needs clustering must inherit {@code Clusterable} interface.
+ * Any class that needs K-means clustering should inherit {@code Clusterable} interface.
  */
 public interface Clusterable {
-  /** Returns the doc id. **/
+  /** Returns the doc id. */
   int docId();
 
-  /** Get point value. **/
+  /** Get point value. */
   float[] getPoint();
 }

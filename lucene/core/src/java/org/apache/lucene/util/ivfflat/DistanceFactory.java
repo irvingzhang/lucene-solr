@@ -19,7 +19,12 @@ package org.apache.lucene.util.ivfflat;
 
 import org.apache.lucene.index.VectorValues;
 
+/**
+ * {@code DistanceFactory} is a factory for creating distance measures.
+ */
 public final class DistanceFactory {
+
+  /** Returns distance measure according to the distance function. */
   public static DistanceMeasure instance(VectorValues.DistanceFunction distFunc) {
     switch (distFunc) {
       case MANHATTAN:
@@ -59,6 +64,9 @@ public final class DistanceFactory {
           }
           return (float) (1.0F - sum / (Math.sqrt(squareSum1) * Math.sqrt(squareSum2)));
         };
+
+      case NONE:
+        return (v1, v2) -> 0F;
 
       default:
         throw new UnsupportedOperationException("Clustering using unsupported distance function " + distFunc);

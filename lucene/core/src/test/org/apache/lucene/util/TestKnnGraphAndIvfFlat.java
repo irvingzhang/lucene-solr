@@ -58,7 +58,7 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
   }
 
   public void testComparison() throws Exception {
-    int numDocs = 4000, dimension = 100;
+    int numDocs = 2000, dimension = 100;
 
     float[][] randomVectors = randomVectors(numDocs, dimension);
 
@@ -163,12 +163,12 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
       TopDocs result = searcher.search(query, expectSize);
       long costTime = System.currentTimeMillis() - startTime;
 
-      int recallCnt = 0, exactRecallCnt = 0;
+      int totalRecallCnt = 0, exactRecallCnt = 0;
       for (LeafReaderContext ctx : reader.leaves()) {
         VectorValues vector = ctx.reader().getVectorValues(KNN_VECTOR_FIELD);
         for (ScoreDoc doc : result.scoreDocs) {
           if (vector.seek(doc.doc - ctx.docBase)) {
-            ++recallCnt;
+            ++totalRecallCnt;
             if (forceEqual) {
               assertEquals(0, Arrays.compare(value, vector.vectorValue()));
               ++exactRecallCnt;
@@ -180,7 +180,7 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
           }
         }
       }
-      assertEquals(expectSize, recallCnt);
+      assertEquals(expectSize, totalRecallCnt);
 
       es.shutdown();
 

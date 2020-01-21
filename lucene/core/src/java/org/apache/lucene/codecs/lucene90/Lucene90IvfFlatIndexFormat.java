@@ -20,11 +20,9 @@ package org.apache.lucene.codecs.lucene90;
 import java.io.IOException;
 
 import org.apache.lucene.codecs.CodecUtil;
-import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.IvfFlatIndexFormat;
 import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.IvfFlatIndexWriter;
-import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.store.DataOutput;
@@ -72,8 +70,6 @@ public class Lucene90IvfFlatIndexFormat extends IvfFlatIndexFormat {
 
   /**
    * Returns a {@link IvfFlatIndexReader} to read the vectors and ivfflat from the index.
-   *
-   * @param state
    */
   @Override
   public IvfFlatIndexReader fieldsReader(SegmentReadState state) throws IOException {

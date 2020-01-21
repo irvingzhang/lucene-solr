@@ -21,15 +21,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@code Cluster} describes a cluster of points that belongs to a certain central point.
+ * {@code Cluster} describes a set of points that belongs to a certain centroid.
  */
 public class Cluster<T extends Clusterable> {
   private final ArrayList<T> points = new ArrayList<>();
 
+  /** Add a point to this cluster. */
   public void addPoint(T point) {
     this.points.add(point);
   }
 
+  /** Returns all points belong to this cluster. */
   public List<T> getPoints() {
     return this.points;
   }

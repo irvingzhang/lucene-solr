@@ -23,10 +23,12 @@ package org.apache.lucene.util.ivfflat;
 public class Centroid<T extends Clusterable> extends Cluster<T> {
   private final Clusterable center;
 
+  /** Sole constructor */
   public Centroid(Clusterable center) {
     this.center = center;
   }
 
+  /** Returns the centroid point */
   public Clusterable getCenter() {
     return this.center;
   }

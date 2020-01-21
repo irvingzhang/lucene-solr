@@ -27,26 +27,24 @@ import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
 
-public class IvFFlatIndex implements Accountable {
+public class IvfFlatIndex implements Accountable {
   private final DistanceMeasure distanceMeasure;
   private List<ClusteredPoints> clusteredPoints;
 
-  private boolean frozen = false;
   private long ramBytesUsed;
 
-  public IvFFlatIndex(VectorValues.DistanceFunction distFunc) {
+  public IvfFlatIndex(VectorValues.DistanceFunction distFunc) {
     this.distanceMeasure = DistanceFactory.instance(distFunc);
     this.clusteredPoints = Collections.EMPTY_LIST;
     this.ramBytesUsed = 0;
   }
 
-  public IvFFlatIndex setClusteredPoints(List<ClusteredPoints> clusteredPoints) {
+  public IvfFlatIndex setClusteredPoints(List<ClusteredPoints> clusteredPoints) {
     this.clusteredPoints = clusteredPoints;
     return this;
   }
 
-  public IvFFlatIndex finish() {
-    this.frozen = true;
+  public IvfFlatIndex finish() {
     return this;
   }
 
@@ -60,6 +58,10 @@ public class IvFFlatIndex implements Accountable {
    * @return sorted results
    */
   SortedImmutableVectorValue search(float[] query, int ef, int centroids, VectorValues vectorValues) throws IOException {
+    if (clusteredPoints.isEmpty()) {
+      return new SortedImmutableVectorValue(0, query, this.distanceMeasure);
+    }
+
     ensureCentroids(vectorValues);
 
     /// Phase one -> search top center points and their invert index links
@@ -81,7 +83,7 @@ public class IvFFlatIndex implements Accountable {
     }
 
     SortedImmutableVectorValue results = new SortedImmutableVectorValue(ef, query, this.distanceMeasure);
-    clusters.forEach(cluster -> results.insertWithOverflow(cluster));
+    clusters.forEach(results::insertWithOverflow);
 
     /// Phase two -> search topK center points and their inverted index links
     IOException[] exceptions = new IOException[]{null};
@@ -110,23 +112,16 @@ public class IvFFlatIndex implements Accountable {
   }
 
   private void ensureCentroids(VectorValues vectorValues) throws IOException {
-    IOException[] exceptions = new IOException[]{null};
-    clusteredPoints.forEach(point -> {
-      if (point.getCentroidValue() == null) {
-        try {
-          if (!vectorValues.seek(point.getCenter())) {
-            throw new IllegalStateException("docId=" + point.getCenter() + " has no vector value");
-          }
-
-          point.centroidValue = vectorValues.vectorValue().clone();
-        } catch (IOException e) {
-          exceptions[0] = e;
-        }
+    for (ClusteredPoints clusteredPoint : clusteredPoints) {
+      if (clusteredPoint.getCentroidValue() != null) {
+        continue;
       }
-    });
 
-    if (exceptions[0] != null) {
-      throw exceptions[0];
+      if (!vectorValues.seek(clusteredPoint.getCenter())) {
+        throw new IllegalStateException("docId=" + clusteredPoint.getCenter() + " has no vector value");
+      }
+
+      clusteredPoint.setCentroidValue(vectorValues.vectorValue().clone());
     }
   }
 
@@ -143,7 +138,7 @@ public class IvFFlatIndex implements Accountable {
 
   public static class ClusteredPoints implements Accountable {
     private final int centroid;
-    /// TODO cache vector values for center points
+    /// cache vector values for centroid, non-centroid should be null
     private float[] centroidValue;
     private final List<Integer> pointsNearCentroid;
 
@@ -192,5 +187,14 @@ public class IvFFlatIndex implements Accountable {
     public long ramBytesUsed() {
       return RamUsageEstimator.shallowSizeOfInstance(getClass()) + RamUsageEstimator.sizeOfCollection(pointsNearCentroid);
     }
+  }
+
+  private static final class IvfFlatIndexHolder {
+    public static final IvfFlatIndex EMPTY_INDEX = new IvfFlatIndex(VectorValues.DistanceFunction.NONE);
+  }
+
+  /** Lazy initialization. */
+  public static IvfFlatIndex emptyInstance() {
+    return IvfFlatIndexHolder.EMPTY_INDEX;
   }
 }

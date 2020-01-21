@@ -94,7 +94,9 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
       return VectorValues.EMPTY;
     }
 
-    final IndexInput bytesSlice = vectorData.slice("vector-data", entry.vectorDataOffset, entry.vectorDataLength);
+    final IndexInput bytesSlice = vectorData.slice("vector-data",
+        entry.vectorDataOffset, entry.vectorDataLength);
+
     return new Lucene90KnnGraphReader.RandomAccessVectorValuesReader(maxDoc, numDims, entry, bytesSlice);
   }
 
@@ -190,7 +192,7 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
 
   private void readFields(ChecksumIndexInput meta, FieldInfos infos) throws IOException {
     for (int fieldNumber = meta.readInt(); fieldNumber != -1; fieldNumber = meta.readInt()) {
-      FieldInfo info = infos.fieldInfo(fieldNumber);
+      final FieldInfo info = infos.fieldInfo(fieldNumber);
       if (info == null) {
         throw new CorruptIndexException("Invalid field number: " + fieldNumber, meta);
       }
@@ -243,15 +245,13 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
 
     final IvfFlatEntry ivfFlatEntry;
 
-    int doc = -1;
-
     private IndexedIvfFlatReader(long maxDoc, IvfFlatEntry ivfFlatEntry) {
       this.maxDoc = maxDoc;
       this.ivfFlatEntry = ivfFlatEntry;
     }
 
     /**
-     * Returns the center points of the ivfflat index.
+     * Returns all the center points.
      *
      * @return the center points of all clusters
      */
@@ -262,12 +262,9 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
 
     /**
      * Returns the inverse list (doc ID list) that belongs to the {@code centroid}.
-     * Each doc ID in the list is closer to the current {@code centroid} than any other center points.
-     * {@code centroid} must be a valid doc ID, ie. &ge; 0 and &le; {@link #NO_MORE_DOCS}.
-     * It is illegal to call this method after {@link #advanceExact(int)}
-     * returned {@code false}.
      *
-     * @param centroid@return friend list
+     * @param centroid the specified centroid
+     * @return points of the specified centroid if the specified centroid exists, empty {@link IntsRef} otherwise.
      */
     @Override
     public IntsRef getIvfLink(int centroid) {

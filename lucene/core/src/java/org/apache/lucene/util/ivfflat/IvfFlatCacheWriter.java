@@ -17,10 +17,8 @@
 
 package org.apache.lucene.util.ivfflat;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -36,7 +34,7 @@ public final class IvfFlatCacheWriter implements Accountable {
   private final IntsRefBuilder docsRef;
   private final List<float[]> rawVectors;
   private final int numDimensions;
-  private final IvFFlatIndex ivFFlatIndex;
+  private final IvfFlatIndex ivFFlatIndex;
   private final KMeansCluster<ImmutableClusterableVector> clusterer;
 
   private int addedDocs = 0;
@@ -46,12 +44,12 @@ public final class IvfFlatCacheWriter implements Accountable {
     this.numDimensions = numDimensions;
     this.docsRef = new IntsRefBuilder();
     this.rawVectors = new ArrayList<>();
-    this.ivFFlatIndex = new IvFFlatIndex(distFunc);
+    this.ivFFlatIndex = new IvfFlatIndex(distFunc);
     this.clusterer = new KMeansCluster<>(distFunc);
   }
 
   /** Inserts a doc with vector value to the graph */
-  public void insert(int docId, BytesRef binaryValue) throws IOException {
+  public void insert(int docId, BytesRef binaryValue) {
     // add the vector value
     float[] value = VectorValues.decode(binaryValue, numDimensions);
     rawVectors.add(value);
@@ -68,11 +66,11 @@ public final class IvfFlatCacheWriter implements Accountable {
     ivFFlatIndex.finish();
   }
 
-  /// TODO if number of rawVectors is large, consider to use partial points for trainning
-  public List<IvFFlatIndex.ClusteredPoints> cluster(List<ImmutableClusterableVector>
+  public List<IvfFlatIndex.ClusteredPoints> cluster(List<ImmutableClusterableVector>
                                                         immutableClusterableVectors) throws NoSuchElementException {
+    /// to accelerate training on large data set, select partial points after shuffling for k-means clustering
     if (immutableClusterableVectors.size() > KMeansCluster.MAX_SUGGEST_TRAINING_POINTS) {
-      /// shuffle collection
+      /// shuffle the whole collection
       Collections.shuffle(immutableClusterableVectors);
 
       /// select a subset for training
@@ -84,9 +82,9 @@ public final class IvfFlatCacheWriter implements Accountable {
 
       /// training
       final List<Centroid<ImmutableClusterableVector>> centroidList = clusterer.cluster(trainingSubset,
-          (int) Math.sqrt(immutableClusterableVectors.size()));
+          (int) Math.sqrt(immutableClusterableVectors.size() >> 1));
 
-      /// insert untrained points to their nearest centroid
+      /// insert each untrained point to its nearest centroid
       untrainedSubset.forEach(point -> {
         final List<Centroid<ImmutableClusterableVector>> nearestCentroidList = centroidList.stream().sorted((o1, o2) -> {
           float lhs = clusterer.distanceMeasure.compute(o1.getCenter().getPoint(), point.getPoint());
@@ -105,13 +103,13 @@ public final class IvfFlatCacheWriter implements Accountable {
           nearestCentroidList.get(0).addPoint(point);
         } else {
           /// must be bug
-          assert false;
+          throw new NoSuchElementException(point.toString() + " has no centroid!");
         }
       });
 
-      return IvFFlatIndex.ClusteredPoints.convert(centroidList);
+      return IvfFlatIndex.ClusteredPoints.convert(centroidList);
     } else {
-      return IvFFlatIndex.ClusteredPoints.convert(clusterer.cluster(immutableClusterableVectors));
+      return IvfFlatIndex.ClusteredPoints.convert(clusterer.cluster(immutableClusterableVectors));
     }
   }
 
@@ -119,16 +117,11 @@ public final class IvfFlatCacheWriter implements Accountable {
     return rawVectors.toArray(new float[0][]);
   }
 
-  /** Returns the built HNSW graph*/
-  public IvFFlatIndex ivFFlatIndex() {
-    return this.ivFFlatIndex;
-  }
-
   @Override
   public long ramBytesUsed() {
     // calculating the exact ram usage is time consuming so we make rough estimation here
     return RamUsageEstimator.sizeOf(docsRef.ints()) +
         Float.BYTES * numDimensions * rawVectors.size() +
-        RamUsageEstimator.shallowSizeOfInstance(IvFFlatIndex.class);
+        RamUsageEstimator.shallowSizeOfInstance(IvfFlatIndex.class);
   }
 }

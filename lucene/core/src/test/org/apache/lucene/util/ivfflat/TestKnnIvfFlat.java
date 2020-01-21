@@ -195,12 +195,12 @@ public class TestKnnIvfFlat extends LuceneTestCase {
       /*System.out.println("Recall vector " + Arrays.toString(value) + " cost " + costTime + " msec, result size -> "
           + result.scoreDocs.length + ", details -> " + Arrays.toString(result.scoreDocs));*/
 
-      int recallCnt = 0, exactRecallCnt = 0;
+      int totalRecallCnt = 0, exactRecallCnt = 0;
       for (LeafReaderContext ctx : reader.leaves()) {
         VectorValues vector = ctx.reader().getVectorValues(KNN_IVF_FLAT_FIELD);
         for (ScoreDoc doc : result.scoreDocs) {
           if (vector.seek(doc.doc - ctx.docBase)) {
-            ++recallCnt;
+            ++totalRecallCnt;
             if (forceEqual) {
               assertEquals(0, Arrays.compare(value, vector.vectorValue()));
               ++exactRecallCnt;
@@ -212,7 +212,7 @@ public class TestKnnIvfFlat extends LuceneTestCase {
           }
         }
       }
-      assertEquals(expectSize, recallCnt);
+      assertEquals(expectSize, totalRecallCnt);
 
       es.shutdown();
 

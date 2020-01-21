@@ -23,16 +23,13 @@ import java.util.List;
 
 import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.IvfFlatIndexWriter;
-import org.apache.lucene.codecs.KnnGraphReader;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.Counter;
 import org.apache.lucene.util.IntsRef;
-import org.apache.lucene.util.ivfflat.Centroid;
-import org.apache.lucene.util.ivfflat.Clusterable;
 import org.apache.lucene.util.ivfflat.ImmutableClusterableVector;
-import org.apache.lucene.util.ivfflat.IvFFlatIndex;
+import org.apache.lucene.util.ivfflat.IvfFlatIndex;
 import org.apache.lucene.util.ivfflat.IvfFlatCacheWriter;
 
 public class IvfFlatWriter implements Accountable {
@@ -152,17 +149,17 @@ public class IvfFlatWriter implements Accountable {
               immutableClusterableVectors.add(new ImmutableClusterableVector(doc, rawVectors[idx++]));
             }
 
-            final List<IvFFlatIndex.ClusteredPoints> clusteredPoints = ivfFlatCacheWriter.cluster(immutableClusterableVectors);
+            final List<IvfFlatIndex.ClusteredPoints> clusteredPoints = ivfFlatCacheWriter.cluster(immutableClusterableVectors);
 
             return new IvfFlatValues() {
               @Override
               public int[] getCentroids() {
-                return clusteredPoints.stream().mapToInt(IvFFlatIndex.ClusteredPoints::getCenter).toArray();
+                return clusteredPoints.stream().mapToInt(IvfFlatIndex.ClusteredPoints::getCenter).toArray();
               }
 
               @Override
               public IntsRef getIvfLink(int centroid) {
-                for (IvFFlatIndex.ClusteredPoints clusteredPoint : clusteredPoints) {
+                for (IvfFlatIndex.ClusteredPoints clusteredPoint : clusteredPoints) {
                   if (clusteredPoint.getCenter() != centroid) {
                     continue;
                   } else {
