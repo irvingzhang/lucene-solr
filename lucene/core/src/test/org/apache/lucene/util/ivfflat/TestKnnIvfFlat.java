@@ -50,9 +50,6 @@ public class TestKnnIvfFlat extends LuceneTestCase {
 
   private static final String KNN_IVF_FLAT_FIELD = "vector";
 
-  /**
-   * Basic test of creating documents in a graph
-   */
   public void testBasic() throws Exception {
     try (Directory dir = newDirectory(); IndexWriter iw = new IndexWriter(
         dir, newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
