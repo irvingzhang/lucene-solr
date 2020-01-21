@@ -36,11 +36,8 @@ public abstract class IvfFlatValues {
   /**
    * Returns the inverse list (doc ID list) that belongs to the {@code centroid}.
    * Each doc ID in the list is closer to the current {@code centroid} than any other center points.
-   * {@code centroid} must be a valid doc ID, ie. &ge; 0 and &le; {@link #NO_MORE_DOCS}.
-   * It is illegal to call this method after {@link #advanceExact(int)}
-   * returned {@code false}.
-   * @param level the graph level
-   * @return friend list
+   * @param centroid docId of the centroid
+   * @return all the docIDs that belongs to the centroid
    */
   public abstract IntsRef getIvfLink(int centroid);
 
@@ -59,11 +56,10 @@ public abstract class IvfFlatValues {
     /**
      * Returns the inverse list (doc ID list) that belongs to the {@code centroid}.
      * Each doc ID in the list is closer to the current {@code centroid} than any other center points.
-     * {@code centroid} must be a valid doc ID, ie. &ge; 0 and &le; {@link #NO_MORE_DOCS}.
-     * It is illegal to call this method after {@link #advanceExact(int)}
-     * returned {@code false}.
+     * {@code centroid} must be a valid doc ID.
      *
-     * @param centroid@return friend list
+     * @param centroid docID of centroid
+     * @return the docIDs that belong to the centroid
      */
     @Override
     public IntsRef getIvfLink(int centroid) {

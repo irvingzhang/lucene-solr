@@ -18,6 +18,7 @@
 package org.apache.lucene.search;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -93,7 +94,8 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
    */
   @Override
   public String toString(String field) {
-    return String.format(Locale.ROOT, "KnnIvfFlatQuery{field=%s;fromQuery=%s;numCentroids=%d}", field, queryVector, numInvertLinks);
+    return String.format(Locale.ROOT, "KnnIvfFlatQuery{field=%s;fromQuery=%s;numCentroids=%d}",
+        field, Arrays.toString(queryVector), numInvertLinks);
   }
 
   /**
@@ -116,13 +118,14 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
    * the same class and its document-filtering properties are identical that other
    * instance. Utility methods are provided for certain repetitive code.
    *
-   * @param other
+   * @param other target object for comparison
    * @see #sameClassAs(Object)
    * @see #classHash()
    */
   @Override
   public boolean equals(Object other) {
-    return sameClassAs(other) && equalsTo(getClass().cast(other));
+    return sameClassAs(other) &&
+        equalsTo(getClass().cast(other));
   }
 
   /**
@@ -146,7 +149,8 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
 
   private boolean equalsTo(KnnIvfFlatQuery other) {
     return Objects.equals(field, other.field) &&
-        Objects.equals(queryVector, other.queryVector) &&
-        Objects.equals(numInvertLinks, other.numInvertLinks);
+        Arrays.equals(queryVector, other.queryVector) &&
+        Objects.equals(numInvertLinks, other.numInvertLinks) &&
+        Objects.equals(ef, other.ef);
   }
 }

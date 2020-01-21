@@ -63,7 +63,7 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
    */
   @Override
   public Scorer scorer(LeafReaderContext context) throws IOException {
-    ScorerSupplier supplier = scorerSupplier(context);
+    final ScorerSupplier supplier = scorerSupplier(context);
     if (supplier == null) {
       return null;
     }
@@ -89,12 +89,12 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
     return new ScorerSupplier() {
       @Override
       public Scorer get(long leadCost) throws IOException {
-        SortedImmutableVectorValue neighbors = ivfFlatCacheReader.search(queryVector, ef, numCentroids, vectorValues);
+        final SortedImmutableVectorValue clusteredVectors = ivfFlatCacheReader.search(queryVector, ef, numCentroids, vectorValues);
         return new Scorer(weight) {
 
           int doc = -1;
-          float score = 0.0f;
-          int size = neighbors.size();
+          float score = 0.0F;
+          int size = clusteredVectors.size();
           int offset = 0;
 
           @Override
@@ -106,28 +106,31 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
               }
 
               @Override
-              public int nextDoc() throws IOException {
+              public int nextDoc() {
                 return advance(offset);
               }
 
               @Override
-              public int advance(int target) throws IOException {
-                if (target > size || neighbors.size() == 0) {
+              public int advance(int target) {
+                if (target > size || clusteredVectors.size() == 0) {
                   doc = NO_MORE_DOCS;
-                  score = 0.0f;
+                  score = 0.0F;
                 } else {
                   while (offset < target) {
-                    neighbors.pop();
+                    clusteredVectors.pop();
                     offset++;
                   }
-                  ImmutableUnClusterableVector next = neighbors.pop();
+
+                  final ImmutableUnClusterableVector next = clusteredVectors.pop();
                   offset++;
                   if (next == null) {
                     doc = NO_MORE_DOCS;
-                    score = 0.0f;
+                    score = 0.0F;
                   } else {
                     doc = next.docId();
-                    score = 1.0F / (next.distance() / numDimensions + 0.01F);
+                    if (scoreMode.needsScores()) {
+                      score = 1.0F / (next.distance() / numDimensions + 0.01F);
+                    }
                   }
                 }
                 return doc;
@@ -141,12 +144,16 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
           }
 
           @Override
-          public float getMaxScore(int upTo) throws IOException {
-            return Float.POSITIVE_INFINITY;
+          public float getMaxScore(int upTo) {
+            if (scoreMode.needsScores()) {
+              return Float.POSITIVE_INFINITY;
+            }
+
+            return 0.0F;
           }
 
           @Override
-          public float score() throws IOException {
+          public float score() {
             return score;
           }
 
@@ -165,7 +172,8 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
   }
 
   /**
-   * @param ctx
+   *
+   * @param ctx context of leaf reader
    * @return {@code true} if the object can be cached against a given leaf
    */
   @Override

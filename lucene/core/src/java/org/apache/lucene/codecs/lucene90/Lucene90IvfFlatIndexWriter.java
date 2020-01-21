@@ -97,7 +97,7 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
   private Map<Integer, Integer> writeVectors(FieldInfo fieldInfo, IvfFlatIndexReader reader) throws IOException {
     int numDims = fieldInfo.getVectorNumDimensions();
 
-    VectorValues vectors = reader.getVectorValues(fieldInfo.name);
+    final VectorValues vectors = reader.getVectorValues(fieldInfo.name);
 
     final Map<Integer, Integer> vecToDocOffset = new HashMap<>();
     int offset = 0;
@@ -184,7 +184,7 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
 
     final IvfFlatWriter ivfFlatWriter = new IvfFlatWriter(fieldInfo, Counter.newCounter());
     for (Lucene90KnnGraphWriter.VectorValuesSub sub : subs) {
-      MergeState.DocMap docMap = state.docMaps[sub.segmentIndex];
+      final MergeState.DocMap docMap = state.docMaps[sub.segmentIndex];
       int docId;
       while ((docId = sub.nextDoc()) != NO_MORE_DOCS) {
         int mappedDocId = docMap.get(docId);

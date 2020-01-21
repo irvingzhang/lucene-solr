@@ -51,7 +51,7 @@ public class IvfFlatWriter implements Accountable {
     updateBytesUsed();
   }
 
-  public void addValue(int docID, BytesRef binaryValue) throws IOException {
+  public void addValue(int docID, BytesRef binaryValue) {
     if (docID <= lastDocID) {
       throw new IllegalArgumentException("VectorValuesField \"" + fieldInfo.name + "\" appears more than once in this document (only one value is allowed per field)");
     }
@@ -78,14 +78,11 @@ public class IvfFlatWriter implements Accountable {
   public void flush(Sorter.DocMap sortMap, IvfFlatIndexWriter ivfFlatIndexWriter) throws IOException {
     ivfFlatCacheWriter.finish();
     float[][] rawVectors = ivfFlatCacheWriter.rawVectorsArray();
-    final VectorValues vectors = new KnnGraphValuesWriter.BufferedVectorValues(docsWithFieldVec.iterator(),
-        rawVectors);
 
-    final VectorValues vectorValues = vectors;
+    final VectorValues vectorValues = new KnnGraphValuesWriter.BufferedVectorValues(
+        docsWithFieldVec.iterator(), rawVectors);
 
-    ivfFlatIndexWriter.writeField(fieldInfo,
-        new IvfFlatIndexReader() {
-
+    ivfFlatIndexWriter.writeField(fieldInfo, new IvfFlatIndexReader() {
           /**
            * Return the memory usage of this object in bytes. Negative values are illegal.
            */
@@ -105,10 +102,9 @@ public class IvfFlatWriter implements Accountable {
            * <em>mark</em> the {@code Closeable} as closed, prior to throwing
            * the {@code IOException}.
            *
-           * @throws IOException if an I/O error occurs
            */
           @Override
-          public void close() throws IOException {
+          public void close() {
 
           }
 
@@ -121,24 +117,24 @@ public class IvfFlatWriter implements Accountable {
            * @lucene.internal
            */
           @Override
-          public void checkIntegrity() throws IOException {
+          public void checkIntegrity() {
 
           }
 
           /**
            * Returns the {@link VectorValues} for the given {@code field}
            *
-           * @param field
+           * @param field fieldInfo name
            */
           @Override
-          public VectorValues getVectorValues(String field) throws IOException {
+          public VectorValues getVectorValues(String field) {
             return vectorValues;
           }
 
           /**
            * Returns the {@link IvfFlatValues} for the given {@code field}
            *
-           * @param field
+           * @param field fieldInfo name
            */
           @Override
           public IvfFlatValues getIvfFlatValues(String field) throws IOException {
@@ -160,9 +156,7 @@ public class IvfFlatWriter implements Accountable {
               @Override
               public IntsRef getIvfLink(int centroid) {
                 for (IvfFlatIndex.ClusteredPoints clusteredPoint : clusteredPoints) {
-                  if (clusteredPoint.getCenter() != centroid) {
-                    continue;
-                  } else {
+                  if (clusteredPoint.getCenter() == centroid) {
                     int[] ivfLink = clusteredPoint.getPoints().stream().mapToInt(i -> i).toArray();
                     return new IntsRef(ivfLink, 0, ivfLink.length);
                   }

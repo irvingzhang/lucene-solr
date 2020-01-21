@@ -55,9 +55,9 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
     final String metaFileName = IndexFileNames.segmentFileName(state.segmentInfo.name,
         state.segmentSuffix, Lucene90IvfFlatIndexFormat.META_EXTENSION);
 
-    int versionMeta = readMetaAndFields(state, metaFileName);
+    int metaVersion = readMeta(state, metaFileName);
 
-    this.vectorData = openAndCheckFile(state, versionMeta, Lucene90KnnGraphFormat.VECTOR_DATA_EXTENSION,
+    this.vectorData = openAndCheckFile(state, metaVersion, Lucene90KnnGraphFormat.VECTOR_DATA_EXTENSION,
         Lucene90KnnGraphFormat.VECTOR_DATA_CODEC_NAME);
   }
 
@@ -141,7 +141,7 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
     return this.ramBytesUsed;
   }
 
-  private IndexInput openAndCheckFile(SegmentReadState state, int versionMeta, String extension, String codecName) throws IOException {
+  private IndexInput openAndCheckFile(SegmentReadState state, int metaVersion, String extension, String codecName) throws IOException {
     final String dataFileName = IndexFileNames.segmentFileName(state.segmentInfo.name, state.segmentSuffix, extension);
 
     boolean success = false;
@@ -149,12 +149,12 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
     try {
       dataIn = state.directory.openInput(dataFileName, state.context);
 
-      int versionVectorData = CodecUtil.checkIndexHeader(dataIn, codecName,
+      int vectorDataVersion = CodecUtil.checkIndexHeader(dataIn, codecName,
           Lucene90IvfFlatIndexFormat.VERSION_START, Lucene90IvfFlatIndexFormat.VERSION_CURRENT,
           state.segmentInfo.getId(), state.segmentSuffix);
 
-      if (versionMeta != versionVectorData) {
-        throw new CorruptIndexException("Format versions mismatch: meta=" + versionMeta + ", vector data=" + versionVectorData, vectorData);
+      if (metaVersion != vectorDataVersion) {
+        throw new CorruptIndexException("Format versions mismatch: meta=" + metaVersion + ", vector data=" + vectorDataVersion, vectorData);
       }
 
       CodecUtil.retrieveChecksum(dataIn);
@@ -170,12 +170,12 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
     return dataIn;
   }
 
-  private int readMetaAndFields(SegmentReadState state, String metaFileName) throws IOException {
-    int versionMeta = -1;
+  private int readMeta(SegmentReadState state, String metaFileName) throws IOException {
+    int metaVersion = -1;
     try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName, state.context)) {
       Throwable priorE = null;
       try {
-        versionMeta = CodecUtil.checkIndexHeader(meta, Lucene90IvfFlatIndexFormat.META_CODEC_NAME,
+        metaVersion = CodecUtil.checkIndexHeader(meta, Lucene90IvfFlatIndexFormat.META_CODEC_NAME,
             Lucene90IvfFlatIndexFormat.VERSION_START, Lucene90IvfFlatIndexFormat.VERSION_CURRENT,
             state.segmentInfo.getId(), state.segmentSuffix);
 
@@ -187,7 +187,7 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
       }
     }
 
-    return versionMeta;
+    return metaVersion;
   }
 
   private void readFields(ChecksumIndexInput meta, FieldInfos infos) throws IOException {
@@ -230,7 +230,6 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
     final int[] centroids;
     final Map<Integer, IntsRef> docToCentroidOffset;
 
-
     public IvfFlatEntry(long vectorDataOffset, long vectorDataLength, Map<Integer, Integer> docToVectorOrd,
                         Map<Integer, IntsRef> docToCentroidOffset) {
       super(vectorDataOffset, vectorDataLength, docToVectorOrd);
@@ -271,7 +270,6 @@ public class Lucene90IvfFlatIndexReader extends IvfFlatIndexReader {
       if (centroid < 0 || maxDoc < centroid) {
         throw new IllegalArgumentException("centroid must be >= 0 or <= maxDocID (=" + maxDoc + ")");
       }
-
 
       return ivfFlatEntry.docToCentroidOffset.getOrDefault(centroid, new IntsRef());
     }
