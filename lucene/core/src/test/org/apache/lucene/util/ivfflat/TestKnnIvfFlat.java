@@ -99,10 +99,9 @@ public class TestKnnIvfFlat extends LuceneTestCase {
 
       long totalCostTime = 0;
       int totalRecallCnt = 0;
-      QueryResult result;
       int testRecall = Math.min(2000, numDocs);
       for (int i = 0; i < testRecall; ++i) {
-        result = assertRecall(dir, 1, 1, randomVectors[i], false);
+        QueryResult result = assertRecall(dir, 1, 1, randomVectors[i], false);
         totalCostTime += result.costTime;
         totalRecallCnt += result.recallCnt;
       }
@@ -184,7 +183,7 @@ public class TestKnnIvfFlat extends LuceneTestCase {
 
   private QueryResult assertRecall(Directory dir, int expectSize, int topK, float[] value, boolean forceEqual) throws IOException {
     try (IndexReader reader = DirectoryReader.open(dir)) {
-      final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("HNSW"));
+      final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("IVFFLAT"));
       IndexSearcher searcher = new IndexSearcher(reader, es);
       Query query = new KnnIvfFlatQuery(KNN_IVF_FLAT_FIELD, value, topK);
 

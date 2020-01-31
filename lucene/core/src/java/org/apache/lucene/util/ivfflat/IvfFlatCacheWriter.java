@@ -69,27 +69,22 @@ public final class IvfFlatCacheWriter implements Accountable {
   public List<IvfFlatIndex.ClusteredPoints> cluster(List<ImmutableClusterableVector>
                                                         immutableClusterableVectors) throws NoSuchElementException {
     /// to accelerate training on large data set, select partial points after shuffling for k-means clustering
-    if (immutableClusterableVectors.size() > KMeansCluster.MAX_SUGGEST_TRAINING_POINTS) {
-      /// try to sample at least 50% points
-      int trainingSize = Math.max((immutableClusterableVectors.size() >> 1),
-          KMeansCluster.MAX_SUGGEST_TRAINING_POINTS);
-
-      trainingSize = Math.min(trainingSize, KMeansCluster.MAX_ALLOW_TRAINING_POINTS);
-
+    if (immutableClusterableVectors.size() > KMeansCluster.MAX_ALLOW_TRAINING_POINTS) {
       /// shuffle the whole collection
       Collections.shuffle(immutableClusterableVectors);
 
       /// select a subset for training
-      final List<ImmutableClusterableVector> trainingSubset = immutableClusterableVectors.subList(0, trainingSize);
+      final List<ImmutableClusterableVector> trainingSubset = immutableClusterableVectors.subList(0,
+          KMeansCluster.MAX_ALLOW_TRAINING_POINTS);
 
       final List<ImmutableClusterableVector> untrainedSubset = immutableClusterableVectors.subList(
-          trainingSize, immutableClusterableVectors.size());
+          KMeansCluster.MAX_ALLOW_TRAINING_POINTS, immutableClusterableVectors.size());
 
       /// training
       final List<Centroid<ImmutableClusterableVector>> centroidList = clusterer.cluster(trainingSubset,
           (int) Math.sqrt(immutableClusterableVectors.size() >> 1));
 
-      /// insert each untrained point to its nearest centroid
+      /// insert each untrained point to the nearest cluster
       untrainedSubset.forEach(point -> {
         final Optional<Centroid<ImmutableClusterableVector>> nearestCentroid = centroidList.stream().min((o1, o2) -> {
           float lhs = clusterer.getDistanceMeasure().compute(o1.getCenter().getPoint(), point.getPoint());

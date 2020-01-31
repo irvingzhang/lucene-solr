@@ -154,7 +154,7 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
   private QueryResult assertRecall(Directory dir, int expectSize, int topK, float[] value, boolean forceEqual,
                                    VectorValues.VectorIndexType type) throws IOException {
     try (IndexReader reader = DirectoryReader.open(dir)) {
-      final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("HNSW"));
+      final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("HNSW&IVFFLAT"));
       IndexSearcher searcher = new IndexSearcher(reader, es);
       Query query = type == VectorValues.VectorIndexType.HNSW ? new KnnGraphQuery(KNN_VECTOR_FIELD, value, topK) :
           new KnnIvfFlatQuery(KNN_VECTOR_FIELD, value, topK);
