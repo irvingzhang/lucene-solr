@@ -30,7 +30,7 @@ import org.apache.lucene.util.RamUsageEstimator;
  * using ivfflat.
  */
 public class KnnIvfFlatQuery extends Query implements Accountable {
-  private static final int DEFAULT_RESERVED_CENTER_POINTS_FOR_SEARCH = 50;
+  private static final int DEFAULT_RESERVED_CENTER_POINTS_FOR_SEARCH = 32;
 
   private static final int DEFAULT_RESULTS_RESERVED = 50;
 
@@ -40,7 +40,7 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
 
   private final int ef;
 
-  private final int numInvertLinks;
+  private final int numSearchClusters;
 
   private final long ramBytesUsed;
 
@@ -71,19 +71,19 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
    * @param field the field name of query
    * @param queryVector target vector
    * @param ef the number of top docs to reserve
-   * @param numInvertLinks the number of ivfflat invert link to search
+   * @param numSearchClusters the number of clusters for similarity searching
    */
-  public KnnIvfFlatQuery(String field, float[] queryVector, int ef, int numInvertLinks) {
+  public KnnIvfFlatQuery(String field, float[] queryVector, int ef, int numSearchClusters) {
     this.field = field;
     this.queryVector = queryVector;
     this.ef = ef;
-    this.numInvertLinks = numInvertLinks;
+    this.numSearchClusters = numSearchClusters;
     this.ramBytesUsed = RamUsageEstimator.shallowSizeOfInstance(getClass());
   }
 
   @Override
   public Weight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) throws IOException {
-    return new KnnIvfFlatScoreWeight(this, boost, scoreMode, field, queryVector, ef, numInvertLinks);
+    return new KnnIvfFlatScoreWeight(this, boost, scoreMode, field, queryVector, ef, numSearchClusters);
   }
 
   /**
@@ -95,7 +95,7 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
   @Override
   public String toString(String field) {
     return String.format(Locale.ROOT, "KnnIvfFlatQuery{field=%s;fromQuery=%s;numCentroids=%d}",
-        field, Arrays.toString(queryVector), numInvertLinks);
+        field, Arrays.toString(queryVector), numSearchClusters);
   }
 
   /**
@@ -136,7 +136,7 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
    */
   @Override
   public int hashCode() {
-    return classHash() + Objects.hash(field, numInvertLinks, queryVector);
+    return classHash() + Objects.hash(field, numSearchClusters, queryVector);
   }
 
   /**
@@ -150,7 +150,7 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
   private boolean equalsTo(KnnIvfFlatQuery other) {
     return Objects.equals(field, other.field) &&
         Arrays.equals(queryVector, other.queryVector) &&
-        Objects.equals(numInvertLinks, other.numInvertLinks) &&
+        Objects.equals(numSearchClusters, other.numSearchClusters) &&
         Objects.equals(ef, other.ef);
   }
 }

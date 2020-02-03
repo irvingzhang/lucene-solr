@@ -37,8 +37,8 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   /** Max iteration for k-means, a trade-off for efficiency and divergence. */
   private static final int MAX_KMEANS_ITERATIONS = 10;
 
-  /** Make sure at least top 10% centroids and the corresponding points could be searched at default. */
-  private static final int DEFAULT_KMEANS_K = 500;
+  /** Default k for k-means clustering. */
+  private static final int DEFAULT_KMEANS_K = 1000;
 
   private int maxIterations;
 
@@ -85,7 +85,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   public List<Centroid<T>> cluster(Collection<T> trainingPoints, int expectK) throws NoSuchElementException {
     assert !trainingPoints.isEmpty();
 
-    this.k = Math.min(Math.min(trainingPoints.size(), expectK), DEFAULT_KMEANS_K);
+    this.k = Math.min(trainingPoints.size(), expectK);
 
     List<Centroid<T>> clusters = this.initCenters(trainingPoints);
     int[] assignments = new int[trainingPoints.size()];
