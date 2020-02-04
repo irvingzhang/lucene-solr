@@ -82,7 +82,7 @@ public final class IvfFlatCacheWriter implements Accountable {
 
       /// training
       final List<Centroid<ImmutableClusterableVector>> centroidList = clusterer.cluster(trainingSubset,
-          (int) Math.sqrt(immutableClusterableVectors.size() >> 1));
+          (int) Math.sqrt(immutableClusterableVectors.size()) << 2);
 
       /// insert each untrained point to the nearest cluster
       untrainedSubset.forEach(point -> {

@@ -69,8 +69,8 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
    */
   @Override
   public List<Centroid<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException {
-    /// adaptively choose the value for k, where k = sqrt(pointSize / 2)
-    return this.cluster(trainingPoints, (int) Math.sqrt((trainingPoints.size()) >> 1));
+    /// adaptively choose the value for k
+    return this.cluster(trainingPoints, (int) Math.sqrt(trainingPoints.size()) << 2);
   }
 
   /**
