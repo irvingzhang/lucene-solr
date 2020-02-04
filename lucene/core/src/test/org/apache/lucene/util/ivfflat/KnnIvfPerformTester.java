@@ -17,6 +17,7 @@
 
 package org.apache.lucene.util.ivfflat;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.apache.lucene.index.VectorValues;
@@ -38,9 +39,12 @@ public class KnnIvfPerformTester extends LuceneTestCase {
       final List<float[]> siftDataset = KnnIvfAndGraphPerformTester.SiftDataReader.readAll(args[0]);
       assertNotNull(siftDataset);
 
-      KnnIvfAndGraphPerformTester.runCase(siftDataset.size(), siftDataset.get(0).length,
-          siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR);
-    } catch (Exception e) {
+      boolean success = false;
+      while (!success) {
+        success = KnnIvfAndGraphPerformTester.runCase(siftDataset.size(), siftDataset.get(0).length,
+            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, new int[]{8, 16, 32, 64, 128});
+      }
+    } catch (IOException e) {
       e.printStackTrace();
       System.exit(1);
     }

@@ -59,20 +59,26 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
       final List<float[]> siftDataset = SiftDataReader.readRange(args[0], 0, 2000);
       assertNotNull(siftDataset);
 
-      runCase(siftDataset.size(), siftDataset.get(0).length,
-          siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR);
+      boolean success = false;
+      while (!success) {
+        success = runCase(siftDataset.size(), siftDataset.get(0).length,
+            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, null);
+      }
 
-      runCase(siftDataset.size(), siftDataset.get(0).length,
-          siftDataset, VectorValues.VectorIndexType.HNSW, HNSW_INDEX_DIR);
-    } catch (Exception e) {
+      success = false;
+      while (!success) {
+        success = runCase(siftDataset.size(), siftDataset.get(0).length,
+            siftDataset, VectorValues.VectorIndexType.HNSW, HNSW_INDEX_DIR, null);
+      }
+    } catch (IOException e) {
       e.printStackTrace();
       System.exit(1);
     }
   }
 
-  public static void runCase(int numDoc, int dimension, List<float[]> randomVectors,
-                       VectorValues.VectorIndexType type, String indexDir) throws Exception {
-    safeClose(indexDir);
+  public static boolean runCase(int numDoc, int dimension, List<float[]> randomVectors,
+                       VectorValues.VectorIndexType type, String indexDir, int[] centroids) {
+    safeDelete(indexDir);
 
     try (Directory dir = FSDirectory.open(Paths.get(indexDir)); IndexWriter iw = new IndexWriter(
         dir, new IndexWriterConfig(new StandardAnalyzer()).setSimilarity(new AssertingSimilarity(new RandomSimilarity(new Random())))
@@ -85,27 +91,23 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
       iw.commit();
       TestKnnGraphAndIvfFlat.KnnTestHelper.assertConsistent(iw, randomVectors, type);
 
-      long totalCostTime = 0;
-      int totalRecallCnt = 0;
-      TestKnnGraphAndIvfFlat.QueryResult result;
-      int testRecall = Math.min(numDoc, 2000);
-      for (int i = 0; i < testRecall; ++i) {
-        result = TestKnnGraphAndIvfFlat.KnnTestHelper.assertRecall(dir, 1, 1, randomVectors.get(i), false, type);
-        totalCostTime += result.costTime;
-        totalRecallCnt += result.recallCnt;
+      if (centroids != null && centroids.length > 0) {
+        for (int centroid : centroids) {
+          TestKnnGraphAndIvfFlat.assertResult(numDoc, dimension, randomVectors, type, centroid, dir);
+        }
+      } else {
+        TestKnnGraphAndIvfFlat.assertResult(numDoc, dimension, randomVectors, type, 50, dir);
       }
-
-      System.out.println("[***" + type.toString() + "***] Total number of docs -> " + numDoc +
-          ", dimension -> " + dimension + ", recall experiments -> " + testRecall +
-          ", exact recall times -> " + totalRecallCnt + ", total search time -> " +
-          totalCostTime + "msec, avg search time -> " + 1.0F * totalCostTime / testRecall +
-          "msec, recall percent -> " + 100.0F * totalRecallCnt / testRecall + "%");
+    } catch (IOException ignored) {
+      return false;
     }
 
-    safeClose(indexDir);
+    safeDelete(indexDir);
+
+    return true;
   }
 
-  private static void safeClose(final String indexDir) {
+  private static void safeDelete(final String indexDir) {
     try {
       Files.walk(Paths.get(indexDir)).sorted(Comparator.reverseOrder())
           .map(Path::toFile).forEach(File::deleteOnExit);

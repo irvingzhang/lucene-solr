@@ -38,9 +38,9 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
 
   private final float[] queryVector;
 
-  private final int ef;
+  private final int k;
 
-  private final int numSearchClusters;
+  private final int nprobe;
 
   private final long ramBytesUsed;
 
@@ -59,10 +59,10 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
    *
    * @param field the field name of query
    * @param queryVector target vector
-   * @param ef the number of top docs to reserve
+   * @param k the number of top docs to reserve
    */
-  public KnnIvfFlatQuery(String field, float[] queryVector, int ef) {
-    this(field, queryVector, ef, DEFAULT_RESERVED_CENTER_POINTS_FOR_SEARCH);
+  public KnnIvfFlatQuery(String field, float[] queryVector, int k) {
+    this(field, queryVector, k, DEFAULT_RESERVED_CENTER_POINTS_FOR_SEARCH);
   }
 
   /**
@@ -70,20 +70,20 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
    *
    * @param field the field name of query
    * @param queryVector target vector
-   * @param ef the number of top docs to reserve
-   * @param numSearchClusters the number of clusters for similarity searching
+   * @param k the number of top docs to reserve
+   * @param nprobe the number of clusters for similarity searching
    */
-  public KnnIvfFlatQuery(String field, float[] queryVector, int ef, int numSearchClusters) {
+  public KnnIvfFlatQuery(String field, float[] queryVector, int k, int nprobe) {
     this.field = field;
     this.queryVector = queryVector;
-    this.ef = ef;
-    this.numSearchClusters = numSearchClusters;
+    this.k = k;
+    this.nprobe = nprobe;
     this.ramBytesUsed = RamUsageEstimator.shallowSizeOfInstance(getClass());
   }
 
   @Override
   public Weight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) throws IOException {
-    return new KnnIvfFlatScoreWeight(this, boost, scoreMode, field, queryVector, ef, numSearchClusters);
+    return new KnnIvfFlatScoreWeight(this, boost, scoreMode, field, queryVector, k, nprobe);
   }
 
   /**
@@ -95,7 +95,7 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
   @Override
   public String toString(String field) {
     return String.format(Locale.ROOT, "KnnIvfFlatQuery{field=%s;fromQuery=%s;numCentroids=%d}",
-        field, Arrays.toString(queryVector), numSearchClusters);
+        field, Arrays.toString(queryVector), nprobe);
   }
 
   /**
@@ -136,7 +136,7 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
    */
   @Override
   public int hashCode() {
-    return classHash() + Objects.hash(field, numSearchClusters, queryVector);
+    return classHash() + Objects.hash(field, nprobe, queryVector);
   }
 
   /**
@@ -150,7 +150,7 @@ public class KnnIvfFlatQuery extends Query implements Accountable {
   private boolean equalsTo(KnnIvfFlatQuery other) {
     return Objects.equals(field, other.field) &&
         Arrays.equals(queryVector, other.queryVector) &&
-        Objects.equals(numSearchClusters, other.numSearchClusters) &&
-        Objects.equals(ef, other.ef);
+        Objects.equals(nprobe, other.nprobe) &&
+        Objects.equals(k, other.k);
   }
 }

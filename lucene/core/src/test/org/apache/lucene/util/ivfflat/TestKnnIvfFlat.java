@@ -59,15 +59,15 @@ public class TestKnnIvfFlat extends LuceneTestCase {
       TestKnnGraphAndIvfFlat.KnnTestHelper.assertConsistent(iw, Arrays.asList(values), VectorValues.VectorIndexType.IVFFLAT);
 
       TestKnnGraphAndIvfFlat.KnnTestHelper.assertRecall(dir, 1, 1, values[0], true,
-          VectorValues.VectorIndexType.IVFFLAT);
+          VectorValues.VectorIndexType.IVFFLAT, 50);
     }
   }
 
   public void testSearch() throws Exception {
-    int numDocs = 100000;
+    int numDocs = 50000;
     int dimension = 100;
     float[][] randomVectors = TestKnnGraphAndIvfFlat.KnnTestHelper.randomVectors(numDocs, dimension);
 
-    TestKnnGraphAndIvfFlat.runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT);
+    TestKnnGraphAndIvfFlat.runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT, null);
   }
 }

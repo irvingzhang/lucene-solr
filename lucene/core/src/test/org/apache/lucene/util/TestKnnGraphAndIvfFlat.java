@@ -63,38 +63,51 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
 
     float[][] randomVectors = KnnTestHelper.randomVectors(numDocs, dimension);
 
-    runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT);
+    runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT, null);
 
-    runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.HNSW);
+    runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.HNSW, null);
   }
 
   public static void runCase(int numDoc, int dimension, float[][] randomVectors,
-                             VectorValues.VectorIndexType type) throws Exception {
-    try (Directory dir = newDirectory(); IndexWriter iw = new IndexWriter(
-        dir, newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
+                             VectorValues.VectorIndexType type, int[] centroids) throws Exception {
+    try (Directory dir = LuceneTestCase.newDirectory(); IndexWriter iw = new IndexWriter(
+        dir, LuceneTestCase.newIndexWriterConfig(null).setCodec(Codec.forName("Lucene90")))) {
       for (int i = 0; i < numDoc; ++i) {
-        KnnTestHelper.add(iw, i, randomVectors[i], type);
+        TestKnnGraphAndIvfFlat.KnnTestHelper.add(iw, i, randomVectors[i], type);
       }
 
       iw.commit();
-      KnnTestHelper.assertConsistent(iw, Arrays.asList(randomVectors), type);
+      TestKnnGraphAndIvfFlat.KnnTestHelper.assertConsistent(iw, Arrays.asList(randomVectors), type);
 
-      long totalCostTime = 0;
-      int totalRecallCnt = 0;
-      QueryResult result;
-      int testRecall = Math.min(numDoc, 2000);
-      for (int i = 0; i < testRecall; ++i) {
-        result = KnnTestHelper.assertRecall(dir, 1, 1, randomVectors[i], false, type);
-        totalCostTime += result.costTime;
-        totalRecallCnt += result.recallCnt;
+
+      if (centroids != null && centroids.length > 0) {
+        for (int centroid : centroids) {
+          assertResult(numDoc, dimension, Arrays.asList(randomVectors), type, centroid, dir);
+        }
+      } else {
+        assertResult(numDoc, dimension, Arrays.asList(randomVectors), type, 50, dir);
       }
-
-      System.out.println("[***" + type.toString() + "***] Total number of docs -> " + numDoc +
-          ", dimension -> " + dimension + ", recall experiments -> " + testRecall +
-          ", exact recall times -> " + totalRecallCnt + ", total search time -> " +
-          totalCostTime + "msec, avg search time -> " + 1.0F * totalCostTime / testRecall +
-          "msec, recall percent -> " + 100.0F * totalRecallCnt / testRecall + "%");
     }
+  }
+
+  public static void assertResult(int numDoc, int dimension, List<float[]> randomVectors, VectorValues.VectorIndexType type,
+                                  int centroid, Directory dir) throws IOException {
+    long totalCostTime = 0;
+    int totalRecallCnt = 0;
+    QueryResult result;
+    int testRecall = Math.min(numDoc, 2000);
+    for (int i = 0; i < testRecall; ++i) {
+      result = KnnTestHelper.assertRecall(dir, 1, 1, randomVectors.get(i), false, type, centroid);
+      totalCostTime += result.costTime;
+      totalRecallCnt += result.recallCnt;
+    }
+
+    System.out.println("[***" + type.toString() + "***] Total number of docs -> " + numDoc +
+        ", dimension -> " + dimension + (type == VectorValues.VectorIndexType.IVFFLAT ? (", nprobe -> " + centroid) : "")
+        + ", number of recall experiments -> " + testRecall +
+        ", Top1 exact recall times -> " + totalRecallCnt + ", total search time -> " +
+        totalCostTime + "msec, avg search time -> " + 1.0F * totalCostTime / testRecall +
+        "msec, recall percent -> " + 100.0F * totalRecallCnt / testRecall + "%");
   }
 
   public static final class KnnTestHelper {
@@ -158,12 +171,12 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
     }
 
     public static QueryResult assertRecall(Directory dir, int expectSize, int topK, float[] value, boolean forceEqual,
-                                       VectorValues.VectorIndexType type) throws IOException {
+                                       VectorValues.VectorIndexType type, int centroids) throws IOException {
       try (IndexReader reader = DirectoryReader.open(dir)) {
         final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("HNSW&IVFFLAT"));
         IndexSearcher searcher = new IndexSearcher(reader, es);
         Query query = type == VectorValues.VectorIndexType.HNSW ? new KnnGraphQuery(KNN_VECTOR_FIELD, value, topK) :
-            new KnnIvfFlatQuery(KNN_VECTOR_FIELD, value, topK);
+            new KnnIvfFlatQuery(KNN_VECTOR_FIELD, value, topK, centroids);
 
         long startTime = System.currentTimeMillis();
         TopDocs result = searcher.search(query, expectSize);
