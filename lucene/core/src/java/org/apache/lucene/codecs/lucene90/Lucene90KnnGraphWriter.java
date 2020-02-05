@@ -53,7 +53,7 @@ public final class Lucene90KnnGraphWriter extends KnnGraphWriter {
   private boolean finished;
 
   Lucene90KnnGraphWriter(SegmentWriteState state) throws IOException {
-    assert state.fieldInfos.hasVectorValues();
+    assert state.fieldInfos.hasGraphAndVectorValues();
 
     String metaFileName = IndexFileNames.segmentFileName(state.segmentInfo.name, state.segmentSuffix, Lucene90KnnGraphFormat.META_EXTENSION);
     meta = state.directory.createOutput(metaFileName, state.context);
@@ -172,6 +172,7 @@ public final class Lucene90KnnGraphWriter extends KnnGraphWriter {
         reader.checkIntegrity();
       }
     }
+
     for (FieldInfo fieldInfo : mergeState.mergeFieldInfos) {
       if (fieldInfo.hasVectorValues()) {
         mergeKnnGraph(fieldInfo, mergeState);
@@ -230,7 +231,7 @@ public final class Lucene90KnnGraphWriter extends KnnGraphWriter {
   }
 
   /** Tracks state of one binary sub-reader that we are merging */
-  private static class VectorValuesSub extends DocIDMerger.Sub {
+  public static class VectorValuesSub extends DocIDMerger.Sub {
 
     final VectorValues values;
     final int segmentIndex;

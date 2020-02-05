@@ -373,8 +373,8 @@ public class TestKnnGraph extends LuceneTestCase {
       TopDocs result = searcher.search(query, expectSize);
       long costTime = System.currentTimeMillis() - startTime;
 
-      /*System.out.println("Recall vector " + Arrays.toString(value) + " cost " + costTime + " msec, result size -> "
-          + result.scoreDocs.length + ", details -> " + Arrays.toString(result.scoreDocs));*/
+      System.out.println("Recall vector " + Arrays.toString(value) + " cost " + costTime + " msec, result size -> "
+          + result.scoreDocs.length + ", details -> " + Arrays.toString(result.scoreDocs));
 
       int recallCnt = 0;
       for (LeafReaderContext ctx : reader.leaves()) {

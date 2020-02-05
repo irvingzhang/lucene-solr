@@ -116,6 +116,16 @@ public class TestIndexableField extends LuceneTestCase {
         return VectorValues.DistanceFunction.NONE;
       }
 
+      /**
+       * The {@link VectorValues.VectorIndexType} of the field's vector index type
+       *
+       * @return
+       */
+      @Override
+      public VectorValues.VectorIndexType vectorIndexType() {
+        return VectorValues.VectorIndexType.NONE;
+      }
+
       @Override
       public Map<String, String> getAttributes() {
         return null;

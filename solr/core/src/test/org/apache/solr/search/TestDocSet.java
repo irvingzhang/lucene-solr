@@ -26,6 +26,7 @@ import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexReaderContext;
+import org.apache.lucene.index.IvfFlatValues;
 import org.apache.lucene.index.KnnGraphValues;
 import org.apache.lucene.index.LeafMetaData;
 import org.apache.lucene.index.LeafReader;
@@ -447,6 +448,11 @@ public class TestDocSet extends SolrTestCase {
 
       @Override
       public VectorValues getVectorValues(String field) {
+        return null;
+      }
+
+      @Override
+      public IvfFlatValues getIvfFlatValues(String field) throws IOException {
         return null;
       }
 

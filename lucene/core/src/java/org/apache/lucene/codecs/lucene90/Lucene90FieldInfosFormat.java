@@ -20,6 +20,7 @@ package org.apache.lucene.codecs.lucene90;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.DocValuesFormat;
@@ -43,7 +44,7 @@ import org.apache.lucene.store.IndexOutput;
  * Lucene 9.0 Field Infos format.
  * <p>Field names are stored in the field info file, with suffix <tt>.fnm</tt>.
  * <p>FieldInfos (.fnm) --&gt; Header,FieldsCount, &lt;FieldName,FieldNumber,
- * FieldBits,DocValuesBits,DocValuesGen,Attributes,DimensionCount,DimensionNumBytes&gt; <sup>FieldsCount</sup>,Footer
+ * FieldBits,DocValuesBits,DocValuesGen,Attributes,DimensionCount,DimensionNumBytes,VectorDistFunctionByte,VectorIndexTypeByte&gt; <sup>FieldsCount</sup>,Footer
  * <p>Data types:
  * <ul>
  *   <li>Header --&gt; {@link CodecUtil#checkIndexHeader IndexHeader}</li>
@@ -107,6 +108,13 @@ import org.apache.lucene.store.IndexOutput;
  *       <li>3: COSINE distance. ({@link org.apache.lucene.index.VectorValues.DistanceFunction#COSINE})</li>
  *     </ul>
  *   </li>
+ *   <li>VectorIndexType: a byte indicates the vector index type.
+ *     <ul>
+ *       <li>0: no vector index type is specified for this field.</li>
+ *       <li>1: HNSW - a well known graph-base index type. </li>
+ *       <li>2: IVFFLAT - a product quantization based approach. </li>
+ *     </ul>
+ *   </li>
  * </ul>
  *
  * @lucene.experimental
@@ -122,7 +130,7 @@ public final class Lucene90FieldInfosFormat extends FieldInfosFormat {
     final String fileName = IndexFileNames.segmentFileName(segmentInfo.name, segmentSuffix, EXTENSION);
     try (ChecksumIndexInput input = directory.openChecksumInput(fileName, context)) {
       Throwable priorE = null;
-      FieldInfo infos[] = null;
+      FieldInfo[] infos = null;
       try {
         int version = CodecUtil.checkIndexHeader(input,
                                    Lucene90FieldInfosFormat.CODEC_NAME,
@@ -172,11 +180,13 @@ public final class Lucene90FieldInfosFormat extends FieldInfosFormat {
           }
           final int vectorNumDimensions = input.readVInt();
           final VectorValues.DistanceFunction vectorDistFunc = getDistFunc(input, input.readByte());
+          final VectorValues.VectorIndexType indexType = getVecIndexType(input, input.readByte());
 
           try {
             infos[i] = new FieldInfo(name, fieldNumber, storeTermVector, omitNorms, storePayloads, 
                                      indexOptions, docValuesType, dvGen, attributes,
-                                     pointDataDimensionCount, pointIndexDimensionCount, pointNumBytes, vectorNumDimensions, vectorDistFunc, isSoftDeletesField);
+                                     pointDataDimensionCount, pointIndexDimensionCount, pointNumBytes, vectorNumDimensions,
+                                     vectorDistFunc, indexType, isSoftDeletesField);
             infos[i].checkConsistency();
           } catch (IllegalStateException e) {
             throw new CorruptIndexException("invalid fieldinfo for field: " + name + ", fieldNumber=" + fieldNumber, input, e);
@@ -249,11 +259,32 @@ public final class Lucene90FieldInfosFormat extends FieldInfosFormat {
     }
   }
 
+  private static byte indexTypeByte(VectorValues.VectorIndexType type) {
+    switch (type) {
+      case NONE:
+      case HNSW:
+      case IVFFLAT:
+        return (byte)type.id();
+
+      default:
+        // BUG
+        throw new AssertionError("unhandled VectorIndexType: " + type);
+    }
+  }
+
   private static VectorValues.DistanceFunction getDistFunc(IndexInput input, byte b) throws IOException {
     try {
       return VectorValues.DistanceFunction.fromId(b);
     } catch (IllegalArgumentException e) {
       throw new CorruptIndexException("invalid distance function: " + b, input);
+    }
+  }
+
+  private static VectorValues.VectorIndexType getVecIndexType(IndexInput in, byte b) throws IOException {
+    try {
+      return VectorValues.VectorIndexType.fromId(b);
+    } catch (NoSuchElementException e) {
+      throw new CorruptIndexException("invalid vector index type: " + b, in);
     }
   }
 
@@ -331,6 +362,7 @@ public final class Lucene90FieldInfosFormat extends FieldInfosFormat {
         }
         output.writeVInt(fi.getVectorNumDimensions());
         output.writeByte(distFuncByte(fi.getVectorDistFunc()));
+        output.writeByte(indexTypeByte(fi.getVectorIndexType()));
       }
       CodecUtil.writeFooter(output);
     }

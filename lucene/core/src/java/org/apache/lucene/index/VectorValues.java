@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.BytesRef;
@@ -98,6 +99,34 @@ public abstract class VectorValues extends DocIdSetIterator {
     ByteBuffer buffer = ByteBuffer.wrap(bytes.bytes, bytes.offset, bytes.length);
     buffer.asFloatBuffer().get(value);
     return value;
+  }
+
+  public enum VectorIndexType {
+    NONE(0),
+
+    HNSW(1),
+
+    IVFFLAT(2);
+
+    private int id;
+
+    VectorIndexType(int id) {
+      this.id = id;
+    }
+
+    public int id() {
+      return this.id;
+    }
+
+    public static VectorIndexType fromId(int id) {
+      for (VectorIndexType type : VectorIndexType.values()) {
+        if (id == type.id) {
+          return type;
+        }
+      }
+
+      throw new NoSuchElementException("No such vector index type with id " + id);
+    }
   }
 
   /**

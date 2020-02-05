@@ -70,6 +70,7 @@ public class SimpleTextFieldInfosFormat extends FieldInfosFormat {
   static final BytesRef DIM_NUM_BYTES   =  new BytesRef("  dimensional num bytes ");
   static final BytesRef VECTOR_NUM_DIMS =  new BytesRef("  vector number of dimensions ");
   static final BytesRef VECTOR_DIST_FUNC = new BytesRef("  vector distance function ");
+  static final BytesRef VECTOR_INDEX_TYPE = new BytesRef("  vector index type");
   static final BytesRef SOFT_DELETES    =  new BytesRef("  soft-deletes ");
   
   @Override
@@ -159,13 +160,18 @@ public class SimpleTextFieldInfosFormat extends FieldInfosFormat {
         VectorValues.DistanceFunction vectorDistFunc = distanceFunction(distFunc);
 
         SimpleTextUtil.readLine(input, scratch);
+        assert StringHelper.startsWith(scratch.get(), VECTOR_INDEX_TYPE);
+        String vecIndexTypeStr = readString(VECTOR_INDEX_TYPE.length, scratch);
+        VectorValues.VectorIndexType vecIndexType = vectorIndexType(vecIndexTypeStr);
+
+        SimpleTextUtil.readLine(input, scratch);
         assert StringHelper.startsWith(scratch.get(), SOFT_DELETES);
         boolean isSoftDeletesField = Boolean.parseBoolean(readString(SOFT_DELETES.length, scratch));
 
         infos[i] = new FieldInfo(name, fieldNumber, storeTermVector, 
                                  omitNorms, storePayloads, indexOptions, docValuesType, dvGen, Collections.unmodifiableMap(atts),
                                  dataDimensionalCount, indexDimensionalCount, dimensionalNumBytes,
-                                 vectorNumDimensions, vectorDistFunc, isSoftDeletesField);
+                                 vectorNumDimensions, vectorDistFunc, vecIndexType, isSoftDeletesField);
       }
 
       SimpleTextUtil.checkFooter(input);
@@ -188,6 +194,10 @@ public class SimpleTextFieldInfosFormat extends FieldInfosFormat {
 
   public VectorValues.DistanceFunction distanceFunction(String distFunc) {
     return VectorValues.DistanceFunction.valueOf(distFunc);
+  }
+
+  public VectorValues.VectorIndexType vectorIndexType(String vectIndexType) {
+    return VectorValues.VectorIndexType.valueOf(vectIndexType);
   }
   
   private String readString(int offset, BytesRefBuilder scratch) {

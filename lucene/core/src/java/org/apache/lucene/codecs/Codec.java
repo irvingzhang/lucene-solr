@@ -113,6 +113,9 @@ public abstract class Codec implements NamedSPILoader.NamedSPI {
 
   /** Encodes/decodes knn graph */
   public abstract KnnGraphFormat knnGraphFormat();
+
+  /** Encodes/decodes ivfflat index **/
+  public abstract IvfFlatIndexFormat ivfFlatIndexFormat();
   
   /** looks up a codec by name */
   public static Codec forName(String name) {

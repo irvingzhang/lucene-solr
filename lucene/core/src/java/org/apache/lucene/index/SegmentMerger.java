@@ -20,11 +20,11 @@ package org.apache.lucene.index;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Supplier;
 
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.DocValuesConsumer;
 import org.apache.lucene.codecs.FieldsConsumer;
+import org.apache.lucene.codecs.IvfFlatIndexWriter;
 import org.apache.lucene.codecs.KnnGraphWriter;
 import org.apache.lucene.codecs.NormsConsumer;
 import org.apache.lucene.codecs.NormsProducer;
@@ -124,8 +124,12 @@ final class SegmentMerger {
       mergeWithLogging(() -> mergePoints(segmentWriteState), "points", numMerged);
     }
 
-    if (mergeState.mergeFieldInfos.hasVectorValues()) {
-        mergeWithLogging(() -> mergeKnnGraphValues(segmentWriteState), "knn graph", numMerged);
+    if (mergeState.mergeFieldInfos.hasGraphAndVectorValues()) {
+      mergeWithLogging(() -> mergeKnnGraphValues(segmentWriteState), "knn graph", numMerged);
+    }
+
+    if (mergeState.mergeFieldInfos.hasIvfFlatAndVectorValues()) {
+        mergeWithLogging(() -> mergeIvfFlatValues(segmentWriteState), "ivfflat", numMerged);
     }
 
     if (mergeState.mergeFieldInfos.hasVectors()) {
@@ -206,6 +210,12 @@ final class SegmentMerger {
 
   private void mergeKnnGraphValues(SegmentWriteState segmentWriteState) throws IOException {
     try (KnnGraphWriter writer = codec.knnGraphFormat().fieldsWriter(segmentWriteState)) {
+      writer.merge(mergeState);
+    }
+  }
+
+  private void mergeIvfFlatValues(SegmentWriteState segmentWriteState) throws IOException {
+    try (IvfFlatIndexWriter writer = codec.ivfFlatIndexFormat().fieldsWriter(segmentWriteState)) {
       writer.merge(mergeState);
     }
   }

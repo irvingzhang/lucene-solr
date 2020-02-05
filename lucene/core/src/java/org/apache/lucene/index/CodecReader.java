@@ -26,6 +26,7 @@ import java.util.Objects;
 
 import org.apache.lucene.codecs.DocValuesProducer;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.KnnGraphReader;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsReader;
@@ -84,6 +85,12 @@ public abstract class CodecReader extends LeafReader implements Accountable {
    * @lucene.internal
    */
   public abstract KnnGraphReader getKnnGraphReader();
+
+  /**
+   * Expert: retrieve underlying IvfFlatIndexReader
+   * @lucene.internal
+   */
+  public abstract IvfFlatIndexReader getIvfFlatIndexReader();
   
   @Override
   public final void document(int docID, StoredFieldVisitor visitor) throws IOException {
@@ -218,19 +225,37 @@ public abstract class CodecReader extends LeafReader implements Accountable {
       return null;
     }
 
-    return getKnnGraphReader().getVectorValues(field);
+    if (fi.getVectorIndexType() == VectorValues.VectorIndexType.HNSW) {
+      return getKnnGraphReader().getVectorValues(field);
+    }
+
+    return getIvfFlatIndexReader().getVectorValues(field);
   }
 
   @Override
   public final KnnGraphValues getKnnGraphValues(String field) throws IOException {
     ensureOpen();
     FieldInfo fi = getFieldInfos().fieldInfo(field);
-    if (fi == null || fi.getVectorNumDimensions() == 0) {
+    if (fi == null || fi.getVectorNumDimensions() == 0 ||
+        fi.getVectorIndexType() != VectorValues.VectorIndexType.HNSW) {
       // Field does not exist or does not index vectors
       return null;
     }
 
     return getKnnGraphReader().getGraphValues(field);
+  }
+
+  @Override
+  public IvfFlatValues getIvfFlatValues(final String field) throws IOException {
+    ensureOpen();
+
+    FieldInfo fieldInfo = getFieldInfos().fieldInfo(field);
+    if (fieldInfo == null || fieldInfo.getVectorNumDimensions() == 0 ||
+        fieldInfo.getVectorIndexType() != VectorValues.VectorIndexType.IVFFLAT) {
+      return null;
+    }
+
+    return getIvfFlatIndexReader().getIvfFlatValues(field);
   }
 
   @Override

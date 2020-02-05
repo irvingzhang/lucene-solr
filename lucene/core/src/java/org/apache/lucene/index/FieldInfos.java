@@ -48,7 +48,8 @@ public class FieldInfos implements Iterable<FieldInfo> {
   private final boolean hasNorms;
   private final boolean hasDocValues;
   private final boolean hasPointValues;
-  private final boolean hasVectorValues;
+  private final boolean hasGraphAndVectorValues;
+  private final boolean hasIvfFlatAndVectorValues;
   private final String softDeletesField;
   
   // used only by fieldInfo(int)
@@ -69,7 +70,8 @@ public class FieldInfos implements Iterable<FieldInfo> {
     boolean hasNorms = false;
     boolean hasDocValues = false;
     boolean hasPointValues = false;
-    boolean hasVectorValues = false;
+    boolean hasGraphAndVectorValues = false;
+    boolean hasIvfFlatAndVectorValues = false;
     String softDeletesField = null;
 
     int size = 0; // number of elements in byNumberTemp, number of used array slots
@@ -101,7 +103,8 @@ public class FieldInfos implements Iterable<FieldInfo> {
       hasDocValues |= info.getDocValuesType() != DocValuesType.NONE;
       hasPayloads |= info.hasPayloads();
       hasPointValues |= (info.getPointDataDimensionCount() != 0);
-      hasVectorValues |= (info.getVectorNumDimensions() != 0);
+      hasGraphAndVectorValues |= (info.getVectorNumDimensions() != 0 && info.getVectorIndexType() == VectorValues.VectorIndexType.HNSW);
+      hasIvfFlatAndVectorValues |= (info.getVectorNumDimensions() != 0 && info.getVectorIndexType() == VectorValues.VectorIndexType.IVFFLAT);
       if (info.isSoftDeletesField()) {
         if (softDeletesField != null && softDeletesField.equals(info.name) == false) {
           throw new IllegalArgumentException("multiple soft-deletes fields [" + info.name + ", " + softDeletesField + "]");
@@ -118,7 +121,8 @@ public class FieldInfos implements Iterable<FieldInfo> {
     this.hasNorms = hasNorms;
     this.hasDocValues = hasDocValues;
     this.hasPointValues = hasPointValues;
-    this.hasVectorValues = hasVectorValues;
+    this.hasGraphAndVectorValues = hasGraphAndVectorValues;
+    this.hasIvfFlatAndVectorValues = hasIvfFlatAndVectorValues;
     this.softDeletesField = softDeletesField;
 
     List<FieldInfo> valuesTemp = new ArrayList<>();
@@ -208,9 +212,14 @@ public class FieldInfos implements Iterable<FieldInfo> {
     return hasPointValues;
   }
 
-  /** Returns true if any fields have VectorValues */
-  public boolean hasVectorValues() {
-    return hasVectorValues;
+  /** Returns true if any fields have VectorValues and use graph-base indices */
+  public boolean hasGraphAndVectorValues() {
+    return hasGraphAndVectorValues;
+  }
+
+  /** Returns true if any fields have VectorValues and use IVFFlar indices */
+  public boolean hasIvfFlatAndVectorValues() {
+    return hasIvfFlatAndVectorValues;
   }
 
   /** Returns the soft-deletes field name if exists; otherwise returns null */
@@ -554,7 +563,9 @@ public class FieldInfos implements Iterable<FieldInfo> {
         // else we'll allocate a new one:
         final boolean isSoftDeletesField = name.equals(globalFieldNumbers.softDeletesFieldName);
         final int fieldNumber = globalFieldNumbers.addOrGet(name, -1, IndexOptions.NONE, DocValuesType.NONE, 0, 0, 0, 0, VectorValues.DistanceFunction.NONE, isSoftDeletesField);
-        fi = new FieldInfo(name, fieldNumber, false, false, false, IndexOptions.NONE, DocValuesType.NONE, -1, new HashMap<>(), 0, 0, 0, 0, VectorValues.DistanceFunction.NONE, isSoftDeletesField);
+        fi = new FieldInfo(name, fieldNumber, false, false, false, IndexOptions.NONE,
+            DocValuesType.NONE, -1, new HashMap<>(), 0, 0, 0, 0,
+            VectorValues.DistanceFunction.NONE, VectorValues.VectorIndexType.NONE, isSoftDeletesField);
         assert !byName.containsKey(fi.name);
         globalFieldNumbers.verifyConsistent(Integer.valueOf(fi.number), fi.name, DocValuesType.NONE);
         byName.put(fi.name, fi);
@@ -570,6 +581,7 @@ public class FieldInfos implements Iterable<FieldInfo> {
                                           Map<String, String> attributes,
                                           int dataDimensionCount, int indexDimensionCount, int dimensionNumBytes,
                                           int vectorNumDimensions, VectorValues.DistanceFunction vectorDistFunc,
+                                          VectorValues.VectorIndexType type,
                                           boolean isSoftDeletesField) {
       assert assertNotFinished();
       if (docValues == null) {
@@ -588,7 +600,9 @@ public class FieldInfos implements Iterable<FieldInfo> {
         // before then we'll get the same name and number,
         // else we'll allocate a new one:
         final int fieldNumber = globalFieldNumbers.addOrGet(name, preferredFieldNumber, indexOptions, docValues, dataDimensionCount, indexDimensionCount, dimensionNumBytes, vectorNumDimensions, vectorDistFunc, isSoftDeletesField);
-        fi = new FieldInfo(name, fieldNumber, storeTermVector, omitNorms, storePayloads, indexOptions, docValues, dvGen, attributes, dataDimensionCount, indexDimensionCount, dimensionNumBytes, vectorNumDimensions, vectorDistFunc, isSoftDeletesField);
+        fi = new FieldInfo(name, fieldNumber, storeTermVector, omitNorms, storePayloads, indexOptions,
+            docValues, dvGen, attributes, dataDimensionCount, indexDimensionCount, dimensionNumBytes,
+            vectorNumDimensions, vectorDistFunc, type, isSoftDeletesField);
         assert !byName.containsKey(fi.name);
         globalFieldNumbers.verifyConsistent(Integer.valueOf(fi.number), fi.name, fi.getDocValuesType());
         byName.put(fi.name, fi);
@@ -623,7 +637,7 @@ public class FieldInfos implements Iterable<FieldInfo> {
                                  fi.getIndexOptions(), fi.getDocValuesType(), dvGen,
                                  fi.attributes(),
                                  fi.getPointDataDimensionCount(), fi.getPointIndexDimensionCount(), fi.getPointNumBytes(),
-                                 fi.getVectorNumDimensions(), fi.getVectorDistFunc(),
+                                 fi.getVectorNumDimensions(), fi.getVectorDistFunc(), fi.getVectorIndexType(),
                                  fi.isSoftDeletesField());
     }
     

@@ -282,6 +282,11 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   }
 
   @Override
+  public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public KnnGraphValues getKnnGraphValues(String field) {
     throw new UnsupportedOperationException();
   }

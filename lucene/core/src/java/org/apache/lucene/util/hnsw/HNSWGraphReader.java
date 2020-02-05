@@ -18,10 +18,8 @@
 package org.apache.lucene.util.hnsw;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.lucene.index.FieldInfo;
@@ -109,10 +107,10 @@ public final class HNSWGraphReader {
     VectorValues.DistanceFunction distFunc = fi.getVectorDistFunc();
 
     KnnGraphValues graphValues = context.reader().getKnnGraphValues(field);
-    return load(field, distFunc, graphValues);
+    return load(distFunc, graphValues);
   }
 
-  public static HNSWGraph load(String field, VectorValues.DistanceFunction distFunc, KnnGraphValues graphValues) throws IOException {
+  public static HNSWGraph load(VectorValues.DistanceFunction distFunc, KnnGraphValues graphValues) throws IOException {
     HNSWGraph hnsw = new HNSWGraph(distFunc);
     for (int doc = graphValues.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = graphValues.nextDoc()) {
       int maxLevel = graphValues.getMaxLevel();

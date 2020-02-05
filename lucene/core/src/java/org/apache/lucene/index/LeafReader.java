@@ -207,6 +207,9 @@ public abstract class LeafReader extends IndexReader {
    * The returned instance should only be used by a single thread. */
   public abstract VectorValues getVectorValues(String field) throws IOException;
 
+  /** Returns the {@link IvfFlatValues} for the given {@code field} */
+  public abstract IvfFlatValues getIvfFlatValues(final String field) throws IOException;
+
   /** Returns {@link KnnGraphValues} for this field, or null if no {@link KnnGraphValues} were indexed.
    * The returned instance should only be used by a single thread. */
   public abstract KnnGraphValues getKnnGraphValues(String field) throws IOException;

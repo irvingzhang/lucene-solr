@@ -18,6 +18,7 @@ package org.apache.lucene.codecs.asserting;
 
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FilterCodec;
+import org.apache.lucene.codecs.IvfFlatIndexFormat;
 import org.apache.lucene.codecs.LiveDocsFormat;
 import org.apache.lucene.codecs.NormsFormat;
 import org.apache.lucene.codecs.PointsFormat;
@@ -100,6 +101,14 @@ public class AssertingCodec extends FilterCodec {
   @Override
   public PointsFormat pointsFormat() {
     return pointsFormat;
+  }
+
+  /**
+   * Encodes/decodes ivfflat index
+   **/
+  @Override
+  public IvfFlatIndexFormat ivfFlatIndexFormat() {
+    return null;
   }
 
   @Override

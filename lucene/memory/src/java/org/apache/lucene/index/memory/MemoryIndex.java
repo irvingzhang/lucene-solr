@@ -502,7 +502,7 @@ public class MemoryIndex {
     return new FieldInfo(fieldName, ord, fieldType.storeTermVectors(), fieldType.omitNorms(), storePayloads,
         indexOptions, fieldType.docValuesType(), -1, Collections.emptyMap(),
         fieldType.pointDataDimensionCount(), fieldType.pointIndexDimensionCount(), fieldType.pointNumBytes(),
-        fieldType.vectorNumDimensions(), fieldType.vectorDistFunc(), false);
+        fieldType.vectorNumDimensions(), fieldType.vectorDistFunc(), fieldType.vectorIndexType(), false);
   }
 
   private void storePointValues(Info info, BytesRef pointValue) {
@@ -522,7 +522,7 @@ public class MemoryIndex {
           info.fieldInfo.name, info.fieldInfo.number, info.fieldInfo.hasVectors(), info.fieldInfo.hasPayloads(),
           info.fieldInfo.hasPayloads(), info.fieldInfo.getIndexOptions(), docValuesType, -1, info.fieldInfo.attributes(),
           info.fieldInfo.getPointDataDimensionCount(), info.fieldInfo.getPointIndexDimensionCount(), info.fieldInfo.getPointNumBytes(),
-          info.fieldInfo.getVectorNumDimensions(), info.fieldInfo.getVectorDistFunc(),
+          info.fieldInfo.getVectorNumDimensions(), info.fieldInfo.getVectorDistFunc(), info.fieldInfo.getVectorIndexType(),
           info.fieldInfo.isSoftDeletesField()
       );
     } else if (existingDocValuesType != docValuesType) {
@@ -1246,6 +1246,17 @@ public class MemoryIndex {
     public VectorValues getVectorValues(String fieldName) {
       // TODO: FIXME
       return VectorValues.EMPTY;
+    }
+
+    /**
+     * Returns the {@link IvfFlatValues} for the given {@code field}
+     *
+     * @param field
+     */
+    @Override
+    public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+      /// TODO
+      return IvfFlatValues.EMPTY;
     }
 
     @Override

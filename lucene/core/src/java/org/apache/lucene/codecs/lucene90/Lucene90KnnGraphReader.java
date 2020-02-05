@@ -203,25 +203,32 @@ public final class Lucene90KnnGraphReader extends KnnGraphReader {
     return 0;
   }
 
-  private static class KnnGraphEntry {
+  public static class VectorDataEntry {
     final long vectorDataOffset;
     final long vectorDataLength;
+    final Map<Integer, Integer> docToVectorOrd;
+
+    public VectorDataEntry(long vectorDataOffset, long vectorDataLength, Map<Integer, Integer> docToVectorOrd) {
+      this.vectorDataOffset = vectorDataOffset;
+      this.vectorDataLength = vectorDataLength;
+      this.docToVectorOrd = docToVectorOrd;
+    }
+  }
+
+  private static class KnnGraphEntry extends VectorDataEntry {
     final long graphDataOffset;
     final long graphDataLength;
     final int topLevel;
     final int[] enterPoints;
-    final Map<Integer, Integer> docToVectorOrd;
     final Map<Integer, Long> docToGraphOffset;
 
     KnnGraphEntry(long vectorDataOffset, long vectorDataLength, long graphDataOffset, long graphDataLength, int topLevel, int[] enterPoints,
                   Map<Integer, Integer> docToVectorOrd, Map<Integer, Long> docToGraphOffset) {
-      this.vectorDataOffset = vectorDataOffset;
-      this.vectorDataLength = vectorDataLength;
+      super(vectorDataOffset, vectorDataLength, docToVectorOrd);
       this.graphDataOffset = graphDataOffset;
       this.graphDataLength = graphDataLength;
       this.topLevel = topLevel;
       this.enterPoints = enterPoints;
-      this.docToVectorOrd = docToVectorOrd;
       this.docToGraphOffset = docToGraphOffset;
     }
   }
@@ -256,12 +263,12 @@ public final class Lucene90KnnGraphReader extends KnnGraphReader {
   }
 
   /** Read the vector values from the index input stream. This allows random access to the underlying vectors data. */
-  private final static class RandomAccessVectorValuesReader extends VectorValues {
+  public final static class RandomAccessVectorValuesReader extends VectorValues {
 
     final int maxDoc;
     final int numDims;
     final int byteSize;
-    final KnnGraphEntry entry;
+    final VectorDataEntry entry;
     final IndexInput dataIn;
     final BytesRef binaryValue;
     final ByteBuffer byteBuffer;
@@ -270,7 +277,7 @@ public final class Lucene90KnnGraphReader extends KnnGraphReader {
 
     int doc = -1;
 
-    RandomAccessVectorValuesReader(int maxDoc, int numDims, KnnGraphEntry entry, IndexInput dataIn) {
+    RandomAccessVectorValuesReader(int maxDoc, int numDims, VectorDataEntry entry, IndexInput dataIn) {
       this.maxDoc = maxDoc;
       this.numDims = numDims;
       this.entry = entry;

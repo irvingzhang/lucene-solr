@@ -23,6 +23,7 @@ import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FilterCodec;
+import org.apache.lucene.codecs.IvfFlatIndexFormat;
 import org.apache.lucene.codecs.KnnGraphFormat;
 import org.apache.lucene.codecs.LiveDocsFormat;
 import org.apache.lucene.codecs.NormsFormat;
@@ -76,6 +77,8 @@ public class Lucene90Codec extends Codec {
   };
 
   private final KnnGraphFormat knnGraphFormat = new Lucene90KnnGraphFormat();
+
+  private final IvfFlatIndexFormat ivfFlatIndexFormat = new Lucene90IvfFlatIndexFormat();
 
   private final StoredFieldsFormat storedFieldsFormat;
 
@@ -141,6 +144,14 @@ public class Lucene90Codec extends Codec {
   @Override
   public final KnnGraphFormat knnGraphFormat() {
     return knnGraphFormat;
+  }
+
+  /**
+   * Encodes/decodes ivfflat index
+   **/
+  @Override
+  public IvfFlatIndexFormat ivfFlatIndexFormat() {
+    return ivfFlatIndexFormat;
   }
 
   /** Returns the postings format that should be used for writing 

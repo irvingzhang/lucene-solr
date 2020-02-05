@@ -125,6 +125,12 @@ public interface IndexableFieldType {
   public VectorValues.DistanceFunction vectorDistFunc();
 
   /**
+   * The {@link org.apache.lucene.index.VectorValues.VectorIndexType} of the field's vector index type
+   * @return
+   */
+  public VectorValues.VectorIndexType vectorIndexType();
+
+  /**
    * Attributes for the field type.
    *
    * Attributes are not thread-safe, user must not add attributes while other threads are indexing documents
