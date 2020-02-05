@@ -34,17 +34,17 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
 
   private final float[] queryVector;
 
-  private final int ef;
+  private final int k;
 
-  private final int numCentroids;
+  private final int nprobe;
 
-  public KnnIvfFlatScoreWeight(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int ef, int numCentroids) {
+  public KnnIvfFlatScoreWeight(Query query, float score, ScoreMode scoreMode, String field, float[] queryVector, int k, int nprobe) {
     super(query, score);
     this.field = field;
     this.scoreMode = scoreMode;
     this.queryVector = queryVector;
-    this.ef = ef;
-    this.numCentroids = numCentroids;
+    this.k = k;
+    this.nprobe = nprobe;
   }
 
   /**
@@ -75,7 +75,8 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
     final FieldInfo fi = context.reader().getFieldInfos().fieldInfo(field);
     int numDimensions = fi.getVectorNumDimensions();
     if (numDimensions != queryVector.length) {
-      throw new IllegalArgumentException("field=\"" + field + "\" was indexed with dimensions=" + numDimensions + "; this is incompatible with query dimensions=" + queryVector.length);
+      throw new IllegalArgumentException("field=\"" + field + "\" was indexed with dimensions=" +
+          numDimensions + "; this is incompatible with query dimensions=" + queryVector.length);
     }
 
     final IvfFlatCacheReader ivfFlatCacheReader = new IvfFlatCacheReader(field, context);
@@ -89,7 +90,7 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
     return new ScorerSupplier() {
       @Override
       public Scorer get(long leadCost) throws IOException {
-        final SortedImmutableVectorValue clusteredVectors = ivfFlatCacheReader.search(queryVector, ef, numCentroids, vectorValues);
+        final SortedImmutableVectorValue clusteredVectors = ivfFlatCacheReader.search(queryVector, k, nprobe, vectorValues);
         return new Scorer(weight) {
 
           int doc = -1;
@@ -166,7 +167,7 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
 
       @Override
       public long cost() {
-        return ef;
+        return k;
       }
     };
   }
