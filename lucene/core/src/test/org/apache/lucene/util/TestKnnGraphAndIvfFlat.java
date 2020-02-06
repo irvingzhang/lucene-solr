@@ -48,7 +48,9 @@ import org.junit.Before;
 
 import static org.apache.lucene.util.hnsw.HNSWGraphWriter.RAND_SEED;
 
-/** A simple performance comparison for IVFFlat and HNSW */
+/**
+ * A simple performance comparison for IVFFlat and HNSW
+ */
 public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
 
   private static final String KNN_VECTOR_FIELD = "vector";
@@ -96,10 +98,12 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
     int totalRecallCnt = 0;
     QueryResult result;
     int testRecall = Math.min(numDoc, 2000);
-    for (int i = 0; i < testRecall; ++i) {
-      result = KnnTestHelper.assertRecall(dir, 1, 1, randomVectors.get(i), false, type, centroid);
-      totalCostTime += result.costTime;
-      totalRecallCnt += result.recallCnt;
+    try (IndexReader reader = DirectoryReader.open(dir)) {
+      for (int i = 0; i < testRecall; ++i) {
+        result = KnnTestHelper.assertRecall(reader, 1, 1, randomVectors.get(i), false, type, centroid);
+        totalCostTime += result.costTime;
+        totalRecallCnt += result.recallCnt;
+      }
     }
 
     System.out.println("[***" + type.toString() + "***] Total number of docs -> " + numDoc +
@@ -118,7 +122,7 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
       try (DirectoryReader dr = DirectoryReader.open(iw)) {
         KnnGraphValues graphValues;
         IvfFlatValues ivfFlatValues;
-        for (LeafReaderContext ctx: dr.leaves()) {
+        for (LeafReaderContext ctx : dr.leaves()) {
           LeafReader reader = ctx.reader();
           VectorValues vectorValues = reader.getVectorValues(KNN_VECTOR_FIELD);
           if (type == VectorValues.VectorIndexType.HNSW) {
@@ -163,48 +167,46 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
 
     private static float[] randomVector(int numDims) {
       float[] vector = new float[numDims];
-      for(int i = 0; i < numDims; i++) {
+      for (int i = 0; i < numDims; i++) {
         vector[i] = random().nextFloat();
       }
 
       return vector;
     }
 
-    public static QueryResult assertRecall(Directory dir, int expectSize, int topK, float[] value, boolean forceEqual,
-                                       VectorValues.VectorIndexType type, int centroids) throws IOException {
-      try (IndexReader reader = DirectoryReader.open(dir)) {
-        final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("HNSW&IVFFLAT"));
-        IndexSearcher searcher = new IndexSearcher(reader, es);
-        Query query = type == VectorValues.VectorIndexType.HNSW ? new KnnGraphQuery(KNN_VECTOR_FIELD, value, topK) :
-            new KnnIvfFlatQuery(KNN_VECTOR_FIELD, value, topK, centroids);
+    public static QueryResult assertRecall(IndexReader reader, int expectSize, int topK, float[] value, boolean forceEqual,
+                                           VectorValues.VectorIndexType type, int centroids) throws IOException {
+      final ExecutorService es = Executors.newCachedThreadPool(new NamedThreadFactory("HNSW&IVFFLAT"));
+      IndexSearcher searcher = new IndexSearcher(reader, es);
+      Query query = type == VectorValues.VectorIndexType.HNSW ? new KnnGraphQuery(KNN_VECTOR_FIELD, value, topK) :
+          new KnnIvfFlatQuery(KNN_VECTOR_FIELD, value, topK, centroids);
 
-        long startTime = System.currentTimeMillis();
-        TopDocs result = searcher.search(query, expectSize);
-        long costTime = System.currentTimeMillis() - startTime;
+      long startTime = System.currentTimeMillis();
+      TopDocs result = searcher.search(query, expectSize);
+      long costTime = System.currentTimeMillis() - startTime;
 
-        int totalRecallCnt = 0, exactRecallCnt = 0;
-        for (LeafReaderContext ctx : reader.leaves()) {
-          VectorValues vector = ctx.reader().getVectorValues(KNN_VECTOR_FIELD);
-          for (ScoreDoc doc : result.scoreDocs) {
-            if (vector.seek(doc.doc - ctx.docBase)) {
-              ++totalRecallCnt;
-              if (forceEqual) {
-                assertEquals(0, Arrays.compare(value, vector.vectorValue()));
+      int totalRecallCnt = 0, exactRecallCnt = 0;
+      for (LeafReaderContext ctx : reader.leaves()) {
+        VectorValues vector = ctx.reader().getVectorValues(KNN_VECTOR_FIELD);
+        for (ScoreDoc doc : result.scoreDocs) {
+          if (vector.seek(doc.doc - ctx.docBase)) {
+            ++totalRecallCnt;
+            if (forceEqual) {
+              assertEquals(0, Arrays.compare(value, vector.vectorValue()));
+              ++exactRecallCnt;
+            } else {
+              if (Arrays.equals(value, vector.vectorValue())) {
                 ++exactRecallCnt;
-              } else {
-                if (Arrays.equals(value, vector.vectorValue())) {
-                  ++exactRecallCnt;
-                }
               }
             }
           }
         }
-        assertEquals(expectSize, totalRecallCnt);
-
-        es.shutdown();
-
-        return new QueryResult(exactRecallCnt, costTime);
       }
+      assertEquals(expectSize, totalRecallCnt);
+
+      es.shutdown();
+
+      return new QueryResult(exactRecallCnt, costTime);
     }
   }
 

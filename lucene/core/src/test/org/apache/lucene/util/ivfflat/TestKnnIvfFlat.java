@@ -20,6 +20,8 @@ package org.apache.lucene.util.ivfflat;
 import java.util.Arrays;
 
 import org.apache.lucene.codecs.Codec;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.store.Directory;
@@ -58,8 +60,10 @@ public class TestKnnIvfFlat extends LuceneTestCase {
       iw.commit();
       TestKnnGraphAndIvfFlat.KnnTestHelper.assertConsistent(iw, Arrays.asList(values), VectorValues.VectorIndexType.IVFFLAT);
 
-      TestKnnGraphAndIvfFlat.KnnTestHelper.assertRecall(dir, 1, 1, values[0], true,
-          VectorValues.VectorIndexType.IVFFLAT, 50);
+      try (IndexReader reader = DirectoryReader.open(dir)) {
+        TestKnnGraphAndIvfFlat.KnnTestHelper.assertRecall(reader, 1, 1, values[0], true,
+            VectorValues.VectorIndexType.IVFFLAT, 50);
+      }
     }
   }
 

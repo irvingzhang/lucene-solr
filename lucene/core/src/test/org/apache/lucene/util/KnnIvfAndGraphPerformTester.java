@@ -48,7 +48,7 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
   private static final String HNSW_INDEX_DIR = "/tmp/hnsw";
 
   /**
-   * args[0] is the specified dataset  path.
+   * @param args the first arg is the file path of test data set.
    */
   public static void main(String[] args) {
     if (args.length == 0) {
@@ -56,13 +56,13 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
     }
 
     try {
-      final List<float[]> siftDataset = SiftDataReader.readRange(args[0], 0, 2000);
+      final List<float[]> siftDataset = SiftDataReader.readAll(args[0]);
       assertNotNull(siftDataset);
 
       boolean success = false;
       while (!success) {
         success = runCase(siftDataset.size(), siftDataset.get(0).length,
-            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, null);
+            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, new int[]{8, 16, 32, 64, 128});
       }
 
       success = false;
