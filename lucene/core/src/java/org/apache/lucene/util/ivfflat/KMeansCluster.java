@@ -230,7 +230,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   }
 
   private T getFarthestPoint(final Collection<Centroid<T>> clusters) throws NoSuchElementException {
-    float maxDistance = Float.MAX_VALUE;
+    float maxDistance = -1.0F / 0.0F;
     Cluster<T> selectedCluster = null;
     int selectedPoint = -1;
 

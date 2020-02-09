@@ -130,7 +130,18 @@ public class KnnIvfFlatScoreWeight extends ConstantScoreWeight {
                   } else {
                     doc = next.docId();
                     if (scoreMode.needsScores()) {
-                      score = 1.0F / (next.distance() + Float.MIN_NORMAL);
+                      switch (fi.getVectorDistFunc()) {
+                        case MANHATTAN:
+                        case EUCLIDEAN:
+                          score = 1.0F / (next.distance() + Float.MIN_NORMAL);
+                          break;
+                        case COSINE:
+                          score = 1.0F - next.distance();
+                          break;
+                        default:
+                          break;
+                      }
+
                     }
                   }
                 }

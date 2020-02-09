@@ -57,12 +57,13 @@ public final class DistanceFactory {
           assert v1.length == v2.length;
 
           float sum = 0.0F, squareSum1 = 0.0F, squareSum2 = 0.0F;
-          for (int i = 0; i < v1.length; i++) {
+          int dim = v1.length;
+          for (int i = 0; i < dim; ++i) {
             sum += v1[i] * v2[i];
             squareSum1 += v1[i] * v1[i];
             squareSum2 += v2[i] * v2[i];
           }
-          return (float) (sum / (Math.sqrt(squareSum1) * Math.sqrt(squareSum2)));
+          return 1.0F - sum / ((float)Math.sqrt(squareSum1) * (float)Math.sqrt(squareSum2));
         };
 
       case NONE:
