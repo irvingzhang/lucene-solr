@@ -67,7 +67,7 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
       final List<int[]> groundTruthVects = SiftDataReader.ivecReadAll(args[2], queryDataset.size());
       assertNotNull(groundTruthVects);
 
-      runInSetSearch(siftDataset, queryDataset, groundTruthVects);
+      runRecallRatio(siftDataset, queryDataset, groundTruthVects);
 
     } catch (IOException e) {
       e.printStackTrace();
@@ -75,7 +75,7 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
     }
   }
 
-  private static void runInSetSearch(final List<float[]> siftDataset, final List<float[]> queryDataset, final List<int[]> groundTruthVects) {
+  private static void runRecallRatio(final List<float[]> siftDataset, final List<float[]> queryDataset, final List<int[]> groundTruthVects) {
     boolean success = false;
     while (!success) {
       success = runCase(siftDataset.size(), siftDataset.get(0).length,

@@ -49,7 +49,7 @@ public class KnnIvfPerformTester extends LuceneTestCase {
       while (!success) {
         success = KnnIvfAndGraphPerformTester.runCase(siftDataset.size(), siftDataset.get(0).length,
             siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects,
-            new int[]{8, 16, 32, 64, 128});
+            new int[]{8, 16, 32, 64, 128, 256});
       }
     } catch (IOException e) {
       e.printStackTrace();
