@@ -75,7 +75,7 @@ public class IvfFlatWriter implements Accountable {
     bytesUsed = newBytesUsed;
   }
 
-  public void flush(Sorter.DocMap sortMap, IvfFlatIndexWriter ivfFlatIndexWriter) throws IOException {
+  public void flush(IvfFlatIndexWriter ivfFlatIndexWriter) throws IOException {
     ivfFlatCacheWriter.finish();
     float[][] rawVectors = ivfFlatCacheWriter.rawVectorsArray();
 
@@ -138,7 +138,7 @@ public class IvfFlatWriter implements Accountable {
            */
           @Override
           public IvfFlatValues getIvfFlatValues(String field) throws IOException {
-            final List<ImmutableClusterableVector> immutableClusterableVectors = new ArrayList<>();
+            final List<ImmutableClusterableVector> immutableClusterableVectors = new ArrayList<>(rawVectors.length);
             final DocIdSetIterator docsWithField = docsWithFieldVec.iterator();
             int idx = 0;
             for (int doc = docsWithField.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = docsWithField.nextDoc()) {

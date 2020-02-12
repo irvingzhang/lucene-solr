@@ -31,18 +31,25 @@ public class KnnIvfPerformTester extends LuceneTestCase {
    * args[0] is the specified dataset path.
    */
   public static void main(String[] args) {
-    if (args.length == 0) {
+    if (args.length < 3) {
       PrintHelp();
     }
 
     try {
-      final List<float[]> siftDataset = KnnIvfAndGraphPerformTester.SiftDataReader.readAll(args[0]);
+      final List<float[]> siftDataset = KnnIvfAndGraphPerformTester.SiftDataReader.fvecReadAll(args[0]);
       assertNotNull(siftDataset);
+
+      final List<float[]> queryDataset = KnnIvfAndGraphPerformTester.SiftDataReader.fvecReadAll(args[1]);
+      assertNotNull(queryDataset);
+
+      final List<int[]> groundTruthVects = KnnIvfAndGraphPerformTester.SiftDataReader.ivecReadAll(args[2], queryDataset.size());
+      assertNotNull(groundTruthVects);
 
       boolean success = false;
       while (!success) {
         success = KnnIvfAndGraphPerformTester.runCase(siftDataset.size(), siftDataset.get(0).length,
-            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, new int[]{8, 16, 32, 64, 128});
+            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects,
+            new int[]{8, 16, 32, 64, 128});
       }
     } catch (IOException e) {
       e.printStackTrace();
@@ -52,7 +59,7 @@ public class KnnIvfPerformTester extends LuceneTestCase {
 
   private static void PrintHelp() {
     /// sift data path should be indicated
-    System.err.println("Usage: KnnIvfPerformTester ${dataPath}");
+    System.err.println("Usage: KnnIvfPerformTester ${baseVecPath} ${queryVecPath} ${groundTruthPath}");
     System.exit(1);
   }
 }

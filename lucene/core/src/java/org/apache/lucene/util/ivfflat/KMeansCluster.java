@@ -29,10 +29,12 @@ import org.apache.lucene.index.VectorValues;
 /**
  * Migrate from {@link org.apache.commons.math3.ml.clustering.KMeansPlusPlusClusterer}
  * with minor refactoring, avoiding to introduce external dependencies.
+ *
+ * TODO Consider training faster
  */
 public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   /** Maximum allowed point number for training, avoid training last too long */
-  public static final int MAX_ALLOW_TRAINING_POINTS = 200000;
+  public static final int MAX_FULL_TRAINING_POINTS = 200000;
 
   /** Max iteration for k-means, a trade-off for efficiency and divergence. */
   private static final int MAX_KMEANS_ITERATIONS = 10;
@@ -132,6 +134,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
     visited[firstPointIndex] = true;
     float[] minDistSquared = new float[numPoints];
 
+    /// calculate min distance squares between the first point and any other point
     for (int i = 0; i < numPoints; ++i) {
       if (i != firstPointIndex) {
         float d = this.distance(firstPoint, pointList.get(i));
@@ -196,8 +199,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   }
 
   private int assignPointsToClusters(final List<Centroid<T>> clusters, final Collection<T> points, int[] assignments) {
-    int assignedDifferently = 0;
-    int pointIndex = 0;
+    int assignedDifferently = 0, pointIndex = 0;
 
     int clusterIndex;
     for (Iterator<T> i$ = points.iterator(); i$.hasNext(); assignments[pointIndex++] = clusterIndex) {
@@ -207,8 +209,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
         ++assignedDifferently;
       }
 
-      final Centroid<T> cluster = clusters.get(clusterIndex);
-      cluster.addPoint(p);
+      clusters.get(clusterIndex).addPoint(p);
     }
 
     return assignedDifferently;
@@ -230,7 +231,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   }
 
   private T getFarthestPoint(final Collection<Centroid<T>> clusters) throws NoSuchElementException {
-    float maxDistance = -1.0F / 0.0F;
+    float maxDistance = Float.MIN_NORMAL;
     Cluster<T> selectedCluster = null;
     int selectedPoint = -1;
 
@@ -249,7 +250,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
     }
 
     if (selectedCluster == null) {
-      throw new NoSuchElementException("Cannot find point from largest number cluster");
+      throw new NoSuchElementException("Cannot find point from farthest cluster");
     } else {
       return selectedCluster.getPoints().remove(selectedPoint);
     }

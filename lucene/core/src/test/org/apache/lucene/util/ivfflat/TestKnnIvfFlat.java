@@ -17,7 +17,9 @@
 package org.apache.lucene.util.ivfflat;
 
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.index.DirectoryReader;
@@ -61,8 +63,8 @@ public class TestKnnIvfFlat extends LuceneTestCase {
       TestKnnGraphAndIvfFlat.KnnTestHelper.assertConsistent(iw, Arrays.asList(values), VectorValues.VectorIndexType.IVFFLAT);
 
       try (IndexReader reader = DirectoryReader.open(dir)) {
-        TestKnnGraphAndIvfFlat.KnnTestHelper.assertRecall(reader, 1, 1, values[0], true,
-            VectorValues.VectorIndexType.IVFFLAT, 50);
+        TestKnnGraphAndIvfFlat.KnnTestHelper.assertRecall(reader, 1, values[0],
+            VectorValues.VectorIndexType.IVFFLAT, 50, new int[]{0}, Arrays.asList(values));
       }
     }
   }
@@ -72,6 +74,13 @@ public class TestKnnIvfFlat extends LuceneTestCase {
     int dimension = 100;
     float[][] randomVectors = TestKnnGraphAndIvfFlat.KnnTestHelper.randomVectors(numDocs, dimension);
 
-    TestKnnGraphAndIvfFlat.runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT, null);
+    final List<float[]> queryVects = Arrays.asList(randomVectors).subList(0, 5000);
+    final List<int[]> truth = new ArrayList<>(queryVects.size());
+    for (int i = 0; i < queryVects.size(); ++i) {
+      truth.add(new int[]{i});
+    }
+
+    TestKnnGraphAndIvfFlat.runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT,
+        null, queryVects, truth, 1);
   }
 }

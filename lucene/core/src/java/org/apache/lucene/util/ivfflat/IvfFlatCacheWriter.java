@@ -69,20 +69,25 @@ public final class IvfFlatCacheWriter implements Accountable {
   public List<IvfFlatIndex.ClusteredPoints> cluster(List<ImmutableClusterableVector>
                                                         immutableClusterableVectors) throws NoSuchElementException {
     /// to accelerate training on large data set, select partial points after shuffling for k-means clustering
-    if (immutableClusterableVectors.size() > KMeansCluster.MAX_ALLOW_TRAINING_POINTS) {
+    if (immutableClusterableVectors.size() > KMeansCluster.MAX_FULL_TRAINING_POINTS) {
       /// shuffle the whole collection
       Collections.shuffle(immutableClusterableVectors);
 
+      int expectedCentroids = (int) Math.sqrt(immutableClusterableVectors.size()) << 2;
+
+      /// ensure each centroid has 128 points in avg.
+      int trainingSize = Math.min(immutableClusterableVectors.size(), expectedCentroids << 7);
+
       /// select a subset for training
       final List<ImmutableClusterableVector> trainingSubset = immutableClusterableVectors.subList(0,
-          KMeansCluster.MAX_ALLOW_TRAINING_POINTS);
+          trainingSize);
 
       final List<ImmutableClusterableVector> untrainedSubset = immutableClusterableVectors.subList(
-          KMeansCluster.MAX_ALLOW_TRAINING_POINTS, immutableClusterableVectors.size());
+          trainingSize, immutableClusterableVectors.size());
 
       /// training
       final List<Centroid<ImmutableClusterableVector>> centroidList = clusterer.cluster(trainingSubset,
-          (int) Math.sqrt(immutableClusterableVectors.size()) << 2);
+          expectedCentroids);
 
       /// insert each untrained point to the nearest cluster
       untrainedSubset.forEach(point -> {

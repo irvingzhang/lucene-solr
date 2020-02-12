@@ -341,7 +341,7 @@ final class DefaultIndexingChain extends DocConsumer {
                 ivfFlatIndexWriter = fmt.fieldsWriter(state);
               }
 
-              perField.ivfFlatWriter.flush(sortMap, ivfFlatIndexWriter);
+              perField.ivfFlatWriter.flush(ivfFlatIndexWriter);
               perField.ivfFlatWriter = null;
             }
           } else if (perField.fieldInfo.getVectorNumDimensions() != 0) {

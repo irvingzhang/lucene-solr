@@ -197,7 +197,7 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
       }
     }
 
-    ivfFlatWriter.flush(null, this);
+    ivfFlatWriter.flush(this);
   }
 
   /**

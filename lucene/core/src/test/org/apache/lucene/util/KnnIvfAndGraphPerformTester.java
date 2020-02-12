@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -48,57 +50,73 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
   private static final String HNSW_INDEX_DIR = "/tmp/hnsw";
 
   /**
-   * @param args the first arg is the file path of test data set.
+   * @param args the first arg is the file path of test data set，the second is the query file path and the third is the groundtruth file path.
    */
   public static void main(String[] args) {
-    if (args.length == 0) {
+    if (args.length < 3) {
       PrintHelp();
     }
 
     try {
-      final List<float[]> siftDataset = SiftDataReader.readAll(args[0]);
+      final List<float[]> siftDataset = SiftDataReader.fvecReadAll(args[0]);
       assertNotNull(siftDataset);
 
-      boolean success = false;
-      while (!success) {
-        success = runCase(siftDataset.size(), siftDataset.get(0).length,
-            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, new int[]{8, 16, 32, 64, 128});
-      }
+      final List<float[]> queryDataset = SiftDataReader.fvecReadAll(args[1]);
+      assertNotNull(queryDataset);
 
-      success = false;
-      while (!success) {
-        success = runCase(siftDataset.size(), siftDataset.get(0).length,
-            siftDataset, VectorValues.VectorIndexType.HNSW, HNSW_INDEX_DIR, null);
-      }
+      final List<int[]> groundTruthVects = SiftDataReader.ivecReadAll(args[2], queryDataset.size());
+      assertNotNull(groundTruthVects);
+
+      runInSetSearch(siftDataset, queryDataset, groundTruthVects);
+
     } catch (IOException e) {
       e.printStackTrace();
       System.exit(1);
     }
   }
 
+  private static void runInSetSearch(final List<float[]> siftDataset, final List<float[]> queryDataset, final List<int[]> groundTruthVects) {
+    boolean success = false;
+    while (!success) {
+      success = runCase(siftDataset.size(), siftDataset.get(0).length,
+          siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects, new int[]{8, 16, 32, 64, 128, 256});
+    }
+
+    success = false;
+    while (!success) {
+      success = runCase(siftDataset.size(), siftDataset.get(0).length,
+          siftDataset, VectorValues.VectorIndexType.HNSW, HNSW_INDEX_DIR, queryDataset, groundTruthVects, null);
+    }
+  }
+
   public static boolean runCase(int numDoc, int dimension, List<float[]> randomVectors,
-                       VectorValues.VectorIndexType type, String indexDir, int[] centroids) {
+                       VectorValues.VectorIndexType type, String indexDir, final List<float[]> queryDataset,
+                                final List<int[]> groundTruthVects, int[] centroids) {
     safeDelete(indexDir);
 
     try (Directory dir = FSDirectory.open(Paths.get(indexDir)); IndexWriter iw = new IndexWriter(
         dir, new IndexWriterConfig(new StandardAnalyzer()).setSimilarity(new AssertingSimilarity(new RandomSimilarity(new Random())))
-        .setMaxBufferedDocs(1000000).setMergeScheduler(new SerialMergeScheduler()).setUseCompoundFile(false)
+        .setMaxBufferedDocs(1500000).setRAMBufferSizeMB(4096).setMergeScheduler(new SerialMergeScheduler()).setUseCompoundFile(false)
         .setReaderPooling(false).setCodec(Codec.forName("Lucene90")))) {
       for (int i = 0; i < numDoc; ++i) {
         TestKnnGraphAndIvfFlat.KnnTestHelper.add(iw, i, randomVectors.get(i), type);
       }
 
       iw.commit();
+      iw.forceMerge(1);
       TestKnnGraphAndIvfFlat.KnnTestHelper.assertConsistent(iw, randomVectors, type);
 
       if (centroids != null && centroids.length > 0) {
         for (int centroid : centroids) {
-          TestKnnGraphAndIvfFlat.assertResult(numDoc, dimension, randomVectors, type, centroid, dir);
+          TestKnnGraphAndIvfFlat.assertResult(numDoc, dimension, type, centroid, dir, queryDataset, groundTruthVects,
+              randomVectors, groundTruthVects.get(0).length);
         }
       } else {
-        TestKnnGraphAndIvfFlat.assertResult(numDoc, dimension, randomVectors, type, 50, dir);
+        TestKnnGraphAndIvfFlat.assertResult(numDoc, dimension, type, 50, dir, queryDataset, groundTruthVects,
+            randomVectors, groundTruthVects.get(0).length);
       }
-    } catch (IOException ignored) {
+    } catch (IOException e) {
+      e.printStackTrace();
       return false;
     }
 
@@ -119,7 +137,7 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
 
   private static void PrintHelp() {
     /// sift data path should be indicated
-    System.err.println("Usage: KnnIvfAndGraphPerformTester ${dataPath}");
+    System.err.println("Usage: KnnIvfAndGraphPerformTester ${baseVecPath} ${queryVecPath} ${groundTruthPath}");
     System.exit(1);
   }
 
@@ -127,17 +145,19 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
     private SiftDataReader() {
     }
 
-    public static List<float[]> readAll(final String fileName) throws IOException {
+    public static List<float[]> fvecReadAll(final String fileName) throws IOException {
       final List<float[]> vectors = new ArrayList<>();
       try (FileInputStream stream = new FileInputStream(fileName);
            InputStream fileStream = new DataInputStream(stream)) {
-        while (fileStream.available() > 0) {
-          int vecDims = fromByteArray(fileStream.readNBytes(4));
+        byte[] allBytes = fileStream.readAllBytes();
+        ByteBuffer byteBuffer = ByteBuffer.wrap(allBytes);
+        while (byteBuffer.hasRemaining()) {
+          int vecDims = byteBuffer.order(ByteOrder.LITTLE_ENDIAN).getInt();
           assert vecDims > 0;
 
           float[] vec = new float[vecDims];
           for (int i = 0; i < vecDims; ++i) {
-            vec[i] = fromByteArray(fileStream.readNBytes(4));
+            vec[i] = byteBuffer.order(ByteOrder.LITTLE_ENDIAN).getFloat();
           }
           vectors.add(vec);
         }
@@ -146,41 +166,25 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
       return vectors;
     }
 
-    public static List<float[]> readRange(final String fileName, int from, int to) throws IOException {
-      final List<float[]> vectors = new ArrayList<>();
-      int idx = 0;
+    public static List<int[]> ivecReadAll(final String fileName, int expectSize) throws IOException {
+      final List<int[]> vectors = new ArrayList<>(expectSize);
       try (FileInputStream stream = new FileInputStream(fileName);
            InputStream fileStream = new DataInputStream(stream)) {
-        while (fileStream.available() > 0) {
-          int vecDims = fromByteArray(fileStream.readNBytes(4));
+        byte[] allBytes = fileStream.readAllBytes();
+        ByteBuffer byteBuffer = ByteBuffer.wrap(allBytes);
+        while (byteBuffer.hasRemaining()) {
+          int vecDims = byteBuffer.order(ByteOrder.LITTLE_ENDIAN).getInt();
           assert vecDims > 0;
 
-          float[] vec = new float[vecDims];
+          int[] vec = new int[vecDims];
           for (int i = 0; i < vecDims; ++i) {
-            vec[i] = fromByteArray(fileStream.readNBytes(4));
+            vec[i] = byteBuffer.order(ByteOrder.LITTLE_ENDIAN).getInt();
           }
-
-          if (idx >= from && idx < to) {
-            vectors.add(vec);
-          }
-
-          if (idx == to) {
-            return vectors;
-          }
-
-          ++idx;
+          vectors.add(vec);
         }
       }
 
       return vectors;
-    }
-
-    /// sift file is stored in little endian order
-    private static int fromByteArray(byte[] bytes) {
-      return ((bytes[3] & 0xFF) << 24) |
-          ((bytes[2] & 0xFF) << 16) |
-          ((bytes[1] & 0xFF) << 8) |
-          (bytes[0] & 0xFF);
     }
   }
 }
