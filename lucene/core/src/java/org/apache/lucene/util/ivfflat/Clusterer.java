@@ -31,17 +31,17 @@ public interface Clusterer<T extends Clusterable> {
      *
      * @throws NoSuchElementException if the clustering not converge
      */
-    List<? extends Cluster<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException;
+    List<? extends Cluster<T>> cluster(List<T> trainingPoints) throws NoSuchElementException;
 
     /**
      * Cluster points on the basis of a similarity measure
      *
      * @param trainingPoints collection of training points.
-     * @param expectK specify the parameter k for k-means clustering
+     * @param numCentroids specify the parameter k for k-means clustering
      * @return clusters with centroid points
      * @throws NoSuchElementException if the clustering not converge
      */
-    List<? extends Cluster<T>> cluster(Collection<T> trainingPoints, int expectK) throws NoSuchElementException;
+    List<? extends Cluster<T>> cluster(Collection<T> trainingPoints, int numCentroids) throws NoSuchElementException;
 
     /** Distance by some measure means */
     float distance(Clusterable p1, Clusterable p2);

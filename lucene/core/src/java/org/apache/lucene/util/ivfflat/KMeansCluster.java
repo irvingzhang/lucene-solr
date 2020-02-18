@@ -19,23 +19,22 @@ package org.apache.lucene.util.ivfflat;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Random;
 
 import org.apache.lucene.index.VectorValues;
 
 /**
  * Migrate from {@link org.apache.commons.math3.ml.clustering.KMeansPlusPlusClusterer}
- * with minor refactoring, avoiding to introduce external dependencies.
+ * with refactoring, avoiding to introduce external dependencies.
  *
  * TODO Consider training faster
  */
 public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
-  /** Maximum allowed point number for training, avoid training last too long */
-  public static final int MAX_FULL_TRAINING_POINTS = 200000;
-
   /** Max iteration for k-means, a trade-off for efficiency and divergence. */
   private static final int MAX_KMEANS_ITERATIONS = 10;
 
@@ -70,24 +69,69 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
    * @param trainingPoints collection of training points.
    */
   @Override
-  public List<Centroid<T>> cluster(Collection<T> trainingPoints) throws NoSuchElementException {
-    /// adaptively choose the value for k
-    return this.cluster(trainingPoints, (int) Math.sqrt(trainingPoints.size()) << 2);
+  public List<Centroid<T>> cluster(List<T> trainingPoints) throws NoSuchElementException {
+    int collectionSize = trainingPoints.size();
+    /// Reference: https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index#how-big-is-the-dataset
+    if (collectionSize <= 1E6) {
+      this.k = (int) Math.sqrt(collectionSize) << 2;
+    } else if (collectionSize < 1E7) { /// starting from here, training would be slow
+      /// TODO IVF in combination with HNSW uses HNSW to do the cluster assignment
+      this.k = 65536;
+    } else if (collectionSize < 1E8) { /// not recommend training on so large data sets
+      this.k = 262144;
+    } else {
+      this.k = 1048576;
+    }
+
+    /// ensure each cluster has 128 points in average
+    int trainingSize = Math.min(collectionSize, this.k << 7);
+
+    if (trainingSize < collectionSize) {
+      /// shuffle the whole collection
+      Collections.shuffle(trainingPoints);
+    }
+
+    /// select a subset for training
+    final List<T> trainingSubset = trainingPoints.subList(0, trainingSize);
+
+    final List<T> untrainedSubset = trainingPoints.subList(trainingSize, collectionSize);
+
+    /// training
+    final List<Centroid<T>> centroidList = cluster(trainingSubset, this.k);
+
+    /// insert each untrained point to the nearest cluster
+    untrainedSubset.forEach(point -> {
+      final Optional<Centroid<T>> nearestCentroid = centroidList.stream().min((o1, o2) -> {
+        float lhs = this.distanceMeasure.compute(o1.getCenter().getPoint(), point.getPoint());
+        float rhs = this.distanceMeasure.compute(o2.getCenter().getPoint(), point.getPoint());
+
+        if (lhs < rhs) {
+          return -1;
+        } else if (rhs < lhs) {
+          return 1;
+        }
+
+        return 0;
+      });
+
+      assert nearestCentroid.isPresent();
+      nearestCentroid.get().addPoint(point);
+    });
+
+    return centroidList;
   }
 
   /**
    * Cluster points on the basis of a similarity measure
    *
-   * @param trainingPoints collection of training points.
-   * @param expectK        specify the parameter for k-means training
+   * @param trainingPoints   collection of training points.
+   * @param numCentroids     specify the parameter k for k-means training
    * @return the cluster points with corresponding centroid
    * @throws NoSuchElementException if the clustering not converge
    */
   @Override
-  public List<Centroid<T>> cluster(Collection<T> trainingPoints, int expectK) throws NoSuchElementException {
+  public List<Centroid<T>> cluster(Collection<T> trainingPoints, int numCentroids) throws NoSuchElementException {
     assert !trainingPoints.isEmpty();
-
-    this.k = Math.min(trainingPoints.size(), expectK);
 
     List<Centroid<T>> clusters = this.initCenters(trainingPoints);
     int[] assignments = new int[trainingPoints.size()];

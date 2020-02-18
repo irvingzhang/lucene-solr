@@ -19,10 +19,8 @@ package org.apache.lucene.util.ivfflat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Accountable;
@@ -68,50 +66,10 @@ public final class IvfFlatCacheWriter implements Accountable {
 
   public List<IvfFlatIndex.ClusteredPoints> cluster(List<ImmutableClusterableVector>
                                                         immutableClusterableVectors) throws NoSuchElementException {
-    /// to accelerate training on large data set, select partial points after shuffling for k-means clustering
-    if (immutableClusterableVectors.size() > KMeansCluster.MAX_FULL_TRAINING_POINTS) {
-      /// shuffle the whole collection
-      Collections.shuffle(immutableClusterableVectors);
+    final List<Centroid<ImmutableClusterableVector>> clusteredPoints = clusterer.cluster(immutableClusterableVectors);
+    assert !clusteredPoints.isEmpty();
 
-      int expectedCentroids = (int) Math.sqrt(immutableClusterableVectors.size()) << 2;
-
-      /// ensure each centroid has 128 points in avg.
-      int trainingSize = Math.min(immutableClusterableVectors.size(), expectedCentroids << 7);
-
-      /// select a subset for training
-      final List<ImmutableClusterableVector> trainingSubset = immutableClusterableVectors.subList(0,
-          trainingSize);
-
-      final List<ImmutableClusterableVector> untrainedSubset = immutableClusterableVectors.subList(
-          trainingSize, immutableClusterableVectors.size());
-
-      /// training
-      final List<Centroid<ImmutableClusterableVector>> centroidList = clusterer.cluster(trainingSubset,
-          expectedCentroids);
-
-      /// insert each untrained point to the nearest cluster
-      untrainedSubset.forEach(point -> {
-        final Optional<Centroid<ImmutableClusterableVector>> nearestCentroid = centroidList.stream().min((o1, o2) -> {
-          float lhs = clusterer.getDistanceMeasure().compute(o1.getCenter().getPoint(), point.getPoint());
-          float rhs = clusterer.getDistanceMeasure().compute(o2.getCenter().getPoint(), point.getPoint());
-
-          if (lhs < rhs) {
-            return -1;
-          } else if (rhs < lhs) {
-            return 1;
-          }
-
-          return 0;
-        });
-
-        assert nearestCentroid.isPresent();
-        nearestCentroid.get().addPoint(point);
-      });
-
-      return IvfFlatIndex.ClusteredPoints.convert(centroidList);
-    } else {
-      return IvfFlatIndex.ClusteredPoints.convert(clusterer.cluster(immutableClusterableVectors));
-    }
+    return IvfFlatIndex.ClusteredPoints.convert(clusteredPoints);
   }
 
   public float[][] rawVectorsArray() {
