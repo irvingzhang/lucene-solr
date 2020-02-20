@@ -17,6 +17,8 @@
 
 package org.apache.lucene.index;
 
+import java.io.IOException;
+
 import org.apache.lucene.util.IntsRef;
 
 /**
@@ -39,7 +41,7 @@ public abstract class IvfFlatValues {
    * @param centroid docId of the centroid
    * @return all the docIDs that belongs to the centroid
    */
-  public abstract IntsRef getIvfLink(int centroid);
+  public abstract IntsRef getIvfLink(int centroid) throws IOException;
 
   /** Empty graph value */
   public static final IvfFlatValues EMPTY = new IvfFlatValues() {

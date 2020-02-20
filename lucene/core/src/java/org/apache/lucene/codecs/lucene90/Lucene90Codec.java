@@ -78,7 +78,7 @@ public class Lucene90Codec extends Codec {
 
   private final KnnGraphFormat knnGraphFormat = new Lucene90KnnGraphFormat();
 
-  private final IvfFlatIndexFormat ivfFlatIndexFormat = new Lucene90IvfFlatIndexFormat();
+  private final IvfFlatIndexFormat ivfFlatIndexFormat = new Lucene90IvfFlatIndexFormatV2();
 
   private final StoredFieldsFormat storedFieldsFormat;
 

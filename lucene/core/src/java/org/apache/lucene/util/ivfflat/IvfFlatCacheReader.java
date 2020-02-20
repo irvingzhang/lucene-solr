@@ -39,7 +39,8 @@ public final class IvfFlatCacheReader {
     this.context = context;
   }
 
-  public SortedImmutableVectorValue search(float[] query, int ef, int numCentroids, VectorValues vectorValues) throws IOException {
+  public SortedImmutableVectorValue search(float[] query, int ef, int numCentroids,
+                                           VectorValues vectorValues) throws IOException {
     return load(field, context).search(query, ef, numCentroids, vectorValues);
   }
 
@@ -62,7 +63,7 @@ public final class IvfFlatCacheReader {
     return load(fi.getVectorDistFunc(), context.reader().getIvfFlatValues(field));
   }
 
-  public static IvfFlatIndex load(VectorValues.DistanceFunction distFunc, IvfFlatValues ivfFlatValues) {
+  public static IvfFlatIndex load(VectorValues.DistanceFunction distFunc, final IvfFlatValues ivfFlatValues) throws IOException {
     final int[] centroids = ivfFlatValues.getCentroids();
     final List<IvfFlatIndex.ClusteredPoints> clusteredPointsList = new ArrayList<>(centroids.length);
     for (int centroid : centroids) {
