@@ -199,6 +199,9 @@ public class Lucene90IvfFlatIndexWriterV2 extends IvfFlatIndexWriter {
     if (vectorData != null) {
       CodecUtil.writeFooter(vectorData);
     }
+    if (ivfFlatData != null) {
+      CodecUtil.writeFooter(ivfFlatData);
+    }
   }
 
   @Override
