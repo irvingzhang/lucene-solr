@@ -98,12 +98,23 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
         dir, new IndexWriterConfig(new StandardAnalyzer()).setSimilarity(new AssertingSimilarity(new RandomSimilarity(new Random())))
         .setMaxBufferedDocs(1500000).setRAMBufferSizeMB(4096).setMergeScheduler(new SerialMergeScheduler()).setUseCompoundFile(false)
         .setReaderPooling(false).setCodec(Codec.forName("Lucene90")))) {
+      long totalIndexTime = 0, commitTime = 0, forceMergeTime = 0;
+      long addStartTime = System.currentTimeMillis();
       for (int i = 0; i < numDoc; ++i) {
         TestKnnGraphAndIvfFlat.KnnTestHelper.add(iw, i, randomVectors.get(i), type);
       }
 
+      long addEndTime = System.currentTimeMillis();
       iw.commit();
+      long commitEndTime = System.currentTimeMillis();
+
       iw.forceMerge(1);
+      long forceEndTime = System.currentTimeMillis();
+
+      System.out.println("[***" + type + "***] [ADD] cost " + (addEndTime - addStartTime) + " msec, [COMMIT] cost "
+      + (commitEndTime - addEndTime) + " msec, [ForceMerge1] cost " + (forceEndTime - commitEndTime) + " msec, total cost "
+      + (forceEndTime - commitEndTime) + " msec");
+
       TestKnnGraphAndIvfFlat.KnnTestHelper.assertConsistent(iw, randomVectors, type);
 
       if (centroids != null && centroids.length > 0) {

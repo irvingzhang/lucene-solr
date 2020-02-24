@@ -39,7 +39,9 @@ import org.apache.lucene.util.RamUsageEstimator;
 public class Lucene90IvfFlatIndexReaderV2 extends IvfFlatIndexReader {
   private final FieldInfos fieldInfos;
 
-  private final IndexInput ivfFlatData, vectorData;
+  private IndexInput ivfFlatData;
+
+  private final IndexInput vectorData;
 
   private final int maxDoc;
 
@@ -113,16 +115,13 @@ public class Lucene90IvfFlatIndexReaderV2 extends IvfFlatIndexReader {
    * @param field the field name for retrieval
    */
   @Override
-  public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+  public IvfFlatValues getIvfFlatValues(String field) {
     final IvfFlatEntryV2 ivfFlatEntry = ivfFlats.get(field);
     if (ivfFlatEntry == null) {
       return IvfFlatValues.EMPTY;
     }
 
-    final IndexInput bytesSlice = ivfFlatData.slice("knn-ivf-data", ivfFlatEntry.ivfDataOffset,
-        ivfFlatEntry.ivfDataLenght);
-
-    return new IndexedIvfFlatReaderV2(maxDoc, ivfFlatEntry, bytesSlice);
+    return new IndexedIvfFlatReaderV2(maxDoc, ivfFlatEntry, ivfFlatData);
   }
 
   /**
@@ -161,7 +160,7 @@ public class Lucene90IvfFlatIndexReaderV2 extends IvfFlatIndexReader {
       dataIn = state.directory.openInput(dataFileName, state.context);
 
       int vectorDataVersion = CodecUtil.checkIndexHeader(dataIn, codecName,
-          Lucene90IvfFlatIndexFormat.VERSION_START, Lucene90IvfFlatIndexFormat.VERSION_CURRENT,
+          Lucene90IvfFlatIndexFormatV2.VERSION_START, Lucene90IvfFlatIndexFormatV2.VERSION_CURRENT,
           state.segmentInfo.getId(), state.segmentSuffix);
 
       if (metaVersion != vectorDataVersion) {
@@ -186,8 +185,8 @@ public class Lucene90IvfFlatIndexReaderV2 extends IvfFlatIndexReader {
     try (ChecksumIndexInput meta = state.directory.openChecksumInput(metaFileName, state.context)) {
       Throwable priorE = null;
       try {
-        metaVersion = CodecUtil.checkIndexHeader(meta, Lucene90IvfFlatIndexFormat.META_CODEC_NAME,
-            Lucene90IvfFlatIndexFormat.VERSION_START, Lucene90IvfFlatIndexFormat.VERSION_CURRENT,
+        metaVersion = CodecUtil.checkIndexHeader(meta, Lucene90IvfFlatIndexFormatV2.META_CODEC_NAME,
+            Lucene90IvfFlatIndexFormatV2.VERSION_START, Lucene90IvfFlatIndexFormatV2.VERSION_CURRENT,
             state.segmentInfo.getId(), state.segmentSuffix);
 
         readFields(meta, state.fieldInfos);
@@ -218,16 +217,13 @@ public class Lucene90IvfFlatIndexReaderV2 extends IvfFlatIndexReader {
       final Map<Integer, Integer> docToOrd = new HashMap<>();
       for (int i = 0; i < clustersSize; ++i) {
         int centroid = meta.readVInt();
-        int numClusterPoints = ivfFlatData.readInt();
-        int[] clusterPoints = new int[numClusterPoints];
-        clusterPoints[0] = meta.readVInt();
-        docToOrd.put(clusterPoints[0], ivfFlatData.readVInt());
-        for (int num = 1; num < numClusterPoints; ++num) {
-          clusterPoints[num] = ivfFlatData.readVInt() + clusterPoints[num - 1];
-          docToOrd.put(clusterPoints[num], ivfFlatData.readVInt());
-        }
-
+        docToOrd.put(centroid, meta.readVInt());
         clusters.put(centroid, meta.readVLong());
+      }
+
+      int docSize = meta.readInt();
+      for (int i = 0; i < docSize; ++i) {
+        docToOrd.put(meta.readVInt(), meta.readVInt());
       }
 
       IvfFlatEntryV2 ivfFlatEntry = new IvfFlatEntryV2(vectorDataOffset, vectorDataLength,
@@ -296,12 +292,13 @@ public class Lucene90IvfFlatIndexReaderV2 extends IvfFlatIndexReader {
         return new IntsRef();
       }
 
-      ivfFlatData.seek(ivfFlatEntry.docToCentroidOffset.get(centroid));
+      long offset = ivfFlatEntry.docToCentroidOffset.get(centroid);
+      ivfFlatData.seek(offset);
       int numClusterPoints = ivfFlatData.readInt();
+
       int[] clusterPoints = new int[numClusterPoints];
-      clusterPoints[0] = ivfFlatData.readVInt();
-      for (int num = 1; num < numClusterPoints; ++num) {
-        clusterPoints[num] = ivfFlatData.readVInt() + clusterPoints[num - 1];
+      for (int num = 0; num < numClusterPoints; ++num) {
+        clusterPoints[num] = ivfFlatData.readVInt();
       }
 
       return new IntsRef(clusterPoints, 0, clusterPoints.length);

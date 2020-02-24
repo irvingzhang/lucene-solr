@@ -133,9 +133,9 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
       ivfFlatMeta.writeInt(ivfFlatLink.length);
       if (ivfFlatLink.length > 0) {
         int stop = ivfFlatLink.offset + ivfFlatLink.length;
-        // sort friend ids
+        // sort ivf ids
         Arrays.sort(ivfFlatLink.ints, ivfFlatLink.offset, stop);
-        // write the smallest friend id
+        // write the smallest id
         int ivfElemId = ivfFlatLink.ints[ivfFlatLink.offset];
         ivfFlatMeta.writeVInt(ivfElemId);
         /// write its order in segment

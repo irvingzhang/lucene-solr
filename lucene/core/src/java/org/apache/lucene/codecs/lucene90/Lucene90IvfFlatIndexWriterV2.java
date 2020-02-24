@@ -19,7 +19,6 @@ package org.apache.lucene.codecs.lucene90;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,7 +78,7 @@ public class Lucene90IvfFlatIndexWriterV2 extends IvfFlatIndexWriter {
           state.segmentSuffix);
 
       CodecUtil.writeIndexHeader(vectorData, Lucene90KnnGraphFormat.VECTOR_DATA_CODEC_NAME,
-          Lucene90IvfFlatIndexFormat.VERSION_CURRENT, state.segmentInfo.getId(),
+          Lucene90IvfFlatIndexFormatV2.VERSION_CURRENT, state.segmentInfo.getId(),
           state.segmentSuffix);
 
       success = true;
@@ -101,10 +100,10 @@ public class Lucene90IvfFlatIndexWriterV2 extends IvfFlatIndexWriter {
 
     long ivfDataOffset = ivfFlatData.getFilePointer();
 
-    final Map<Integer, Long> ivfOffsets = writeData(fieldInfo, reader, vecToDocOffset);
+    final Map<Integer, Long> ivfOffsets = writeData(fieldInfo, reader);
 
     writeMeta(fieldInfo, vectorDataOffset, vectorData.getFilePointer() - vectorDataOffset,
-        ivfDataOffset, ivfFlatData.getFilePointer() - ivfDataOffset, ivfOffsets);
+        ivfDataOffset, ivfFlatData.getFilePointer() - ivfDataOffset, ivfOffsets, vecToDocOffset);
   }
 
   private Map<Integer, Integer> writeVectors(final FieldInfo fieldInfo, final IvfFlatIndexReader reader) throws IOException {
@@ -130,24 +129,33 @@ public class Lucene90IvfFlatIndexWriterV2 extends IvfFlatIndexWriter {
   }
 
   private void writeMeta(final FieldInfo field, long vectorDataOffset, long vectorDataLength, long ivfDataOffset,
-                         long ivfDataLenght, final Map<Integer, Long> ivfOffsets) throws IOException {
+                         long ivfDataLenght, final Map<Integer, Long> ivfOffsets, final Map<Integer, Integer> vecToDocOffset) throws IOException {
     ivfFlatMeta.writeInt(field.number);
     ivfFlatMeta.writeVLong(vectorDataOffset);
     ivfFlatMeta.writeVLong(vectorDataLength);
     ivfFlatMeta.writeVLong(ivfDataOffset);
     ivfFlatMeta.writeVLong(ivfDataLenght);
 
-    int numClusters = ivfOffsets.size();
-    ivfFlatMeta.writeInt(numClusters);
+    ivfFlatMeta.writeInt(ivfOffsets.size());
 
-    for (Map.Entry<Integer, Long> cluster: ivfOffsets.entrySet()) {
+    for (Map.Entry<Integer, Long> cluster : ivfOffsets.entrySet()) {
       ivfFlatMeta.writeVInt(cluster.getKey());
+
+      assert vecToDocOffset.containsKey(cluster.getKey());
+      ivfFlatMeta.writeVInt(vecToDocOffset.get(cluster.getKey()));
+
       ivfFlatMeta.writeVLong(cluster.getValue());
+    }
+
+    ivfFlatMeta.writeInt(vecToDocOffset.size() - ivfOffsets.size());
+    vecToDocOffset.entrySet().removeIf(i -> ivfOffsets.containsKey(i.getKey()));
+    for (Map.Entry<Integer, Integer> offset : vecToDocOffset.entrySet()) {
+      ivfFlatMeta.writeVInt(offset.getKey());
+      ivfFlatMeta.writeVInt(offset.getValue());
     }
   }
 
-  private Map<Integer, Long> writeData(final FieldInfo fieldInfo, final IvfFlatIndexReader reader,
-                                       final Map<Integer, Integer> vecToDocOffset) throws IOException {
+  private Map<Integer, Long> writeData(final FieldInfo fieldInfo, final IvfFlatIndexReader reader) throws IOException {
     final IvfFlatValues ivfFlatValues = reader.getIvfFlatValues(fieldInfo.name);
     int[] centroids = ivfFlatValues.getCentroids();
 
@@ -155,28 +163,19 @@ public class Lucene90IvfFlatIndexWriterV2 extends IvfFlatIndexWriter {
     for (int centroid : centroids) {
       ivfOffsets.put(centroid, ivfFlatData.getFilePointer());
 
-      writeIvfData(ivfFlatValues.getIvfLink(centroid), vecToDocOffset);
+      writeIvfData(ivfFlatValues.getIvfLink(centroid));
     }
 
     return ivfOffsets;
   }
 
-  private void writeIvfData(final IntsRef ivfFlatLink, final Map<Integer, Integer> vecToDocOffset) throws IOException {
+  private void writeIvfData(final IntsRef ivfFlatLink) throws IOException {
     ivfFlatData.writeInt(ivfFlatLink.length);
     if (ivfFlatLink.length > 0) {
       int stop = ivfFlatLink.offset + ivfFlatLink.length;
-      // sort friend ids
-      Arrays.sort(ivfFlatLink.ints, ivfFlatLink.offset, stop);
-      // write the smallest friend id
-      int ivfElemId = ivfFlatLink.ints[ivfFlatLink.offset];
-      ivfFlatData.writeVInt(ivfElemId);
-      /// write its order in segment
-      ivfFlatData.writeVInt(vecToDocOffset.get(ivfElemId));
-      for (int idx = ivfFlatLink.offset + 1; idx < stop; ++idx) {
-        // write delta
-        assert ivfFlatLink.ints[idx] > ivfFlatLink.ints[idx - 1];
-        ivfFlatMeta.writeVInt(ivfFlatLink.ints[idx] - ivfFlatLink.ints[idx - 1]);
-        ivfFlatMeta.writeVInt(vecToDocOffset.get(ivfFlatLink.ints[idx]));
+
+      for (int idx = ivfFlatLink.offset; idx < stop; ++idx) {
+        ivfFlatData.writeVInt(ivfFlatLink.ints[idx]);
       }
     }
   }

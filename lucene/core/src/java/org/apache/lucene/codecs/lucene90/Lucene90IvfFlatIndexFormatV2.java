@@ -31,11 +31,11 @@ import org.apache.lucene.store.DataOutput;
  * Lucene 9.0 IVFFlat index format.
  * <p>The centroid and the associated points (clustered by K-Means clustering) are write into the file with suffix <tt>.ifi</tt>.</p>
  * <p>
- *   IVFFlat file (.ifi) --&gt; Header,FieldNumber,VectorDataOffset,VectorDataLength,IvfDataOffset,IvfDataLength,CentroidSize, &lt;Centroid,
- *   IVFIndexDataOffsete&gt;<sup>CentroidSize</sup>,Footer
+ *   IVFFlat file (.ifi) --&gt; Header,FieldNumber,VectorDataOffset,VectorDataLength,IvfDataOffset,IvfDataLength,CentroidSize,&lt;Centroid,
+ *   DocOrder,IVFIndexDataOffsete&gt;<sup>CentroidSize</sup>,LeftDocSize,&lt;DocID&gt;<sup>LeftDocSize</sup>,Footer
  * </p>
  * <p>
- *   IVFFlat file (.ifd) --&gt; Header, &lt;DocIDDelta,DocOrder&gt; <sup>IVFListSize</sup>,Footer
+ *   IVFFlat file (.ifd) --&gt; Header,IVFListSize,&lt;DocIDDelta&gt; <sup>IVFListSize</sup>,Footer
  * </p>
  * <p>Field types:</p>
  * <ul>
@@ -72,7 +72,7 @@ public class Lucene90IvfFlatIndexFormatV2 extends IvfFlatIndexFormat {
    */
   @Override
   public IvfFlatIndexWriter fieldsWriter(SegmentWriteState state) throws IOException {
-    return new Lucene90IvfFlatIndexWriter(state);
+    return new Lucene90IvfFlatIndexWriterV2(state);
   }
 
   /**
@@ -80,6 +80,6 @@ public class Lucene90IvfFlatIndexFormatV2 extends IvfFlatIndexFormat {
    */
   @Override
   public IvfFlatIndexReader fieldsReader(SegmentReadState state) throws IOException {
-    return new Lucene90IvfFlatIndexReader(state);
+    return new Lucene90IvfFlatIndexReaderV2(state);
   }
 }
