@@ -48,25 +48,29 @@ public final class HNSWGraph implements Accountable {
     this.layers = new ArrayList<>();
   }
 
-  private static final class HNSWGraphHolder {
-    public static final HNSWGraph MANHATTAN_HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.MANHATTAN);
+  private static final class MANHATTANHNSWGraphHolder {
+    public static final HNSWGraph HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.MANHATTAN);
+  }
 
-    public static final HNSWGraph EUCLIDEAN_HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.EUCLIDEAN);
+  private static final class EUCLIDEANHNSWGraphHolder {
+    public static final HNSWGraph HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.EUCLIDEAN);
+  }
 
-    public static final HNSWGraph COSINE_HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.COSINE);
+  private static final class COSINEHNSWGraphHolder {
+    public static final HNSWGraph HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.COSINE);
   }
 
   /** Lazy initialization. */
   public static HNSWGraph defaultGraph(VectorValues.DistanceFunction distFunc) {
     switch (distFunc) {
       case EUCLIDEAN:
-        return HNSWGraphHolder.EUCLIDEAN_HNSW_HOLDER;
+        return EUCLIDEANHNSWGraphHolder.HNSW_HOLDER;
 
       case COSINE:
-        return HNSWGraphHolder.COSINE_HNSW_HOLDER;
+        return COSINEHNSWGraphHolder.HNSW_HOLDER;
 
       default:
-        return HNSWGraphHolder.MANHATTAN_HNSW_HOLDER;
+        return MANHATTANHNSWGraphHolder.HNSW_HOLDER;
     }
   }
 
