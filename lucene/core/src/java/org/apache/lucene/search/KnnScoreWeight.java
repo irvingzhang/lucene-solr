@@ -71,7 +71,7 @@ class KnnScoreWeight extends ConstantScoreWeight {
     return new ScorerSupplier() {
       @Override
       public Scorer get(long leadCost) throws IOException {
-        Neighbors neighbors = hnswReader.searchNeighbors(queryVector, ef, vectorValues);
+        Neighbors neighbors = hnswReader.searchNeighborsV2( queryVector, ef, vectorValues);
         visitedCounter.addAndGet(hnswReader.getVisitedCount());
         return new Scorer(weight) {
 
@@ -89,12 +89,12 @@ class KnnScoreWeight extends ConstantScoreWeight {
               }
 
               @Override
-              public int nextDoc() throws IOException {
+              public int nextDoc() {
                 return advance(offset);
               }
 
               @Override
-              public int advance(int target) throws IOException {
+              public int advance(int target) {
                 if (target > size || neighbors.size() == 0) {
                   doc = NO_MORE_DOCS;
                   score = 0.0f;
@@ -135,12 +135,12 @@ class KnnScoreWeight extends ConstantScoreWeight {
           }
 
           @Override
-          public float getMaxScore(int upTo) throws IOException {
+          public float getMaxScore(int upTo) {
             return Float.POSITIVE_INFINITY;
           }
 
           @Override
-          public float score() throws IOException {
+          public float score() {
             return score;
           }
 

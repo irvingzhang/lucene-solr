@@ -20,6 +20,7 @@ package org.apache.lucene.util.hnsw;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.lucene.index.FieldInfo;
@@ -41,6 +42,7 @@ public final class HNSWGraphReader {
   private final String field;
   private final LeafReaderContext context;
   private final VectorValues.DistanceFunction distFunc;
+  private final Random random;
 
   private long visitedCount;
 
@@ -48,6 +50,27 @@ public final class HNSWGraphReader {
     this.field = field;
     this.context = context;
     this.distFunc = context.reader().getFieldInfos().fieldInfo(field).getVectorDistFunc();
+    this.random = new Random();
+  }
+
+  public Neighbors searchNeighborsV2(float[] query, int ef, VectorValues vectorValues) throws IOException {
+    final KnnGraphValues graphValues = context.reader().getKnnGraphValues(field);
+    final int[] enterPoints = graphValues.getEnterPoints();
+    int enterPoint = enterPoints[random.nextInt(enterPoints.length)];
+    if (!vectorValues.seek(enterPoint)) {
+      throw new IllegalStateException("enterPoint=" + enterPoint + " has no vector value");
+    }
+
+    final Neighbor ep = new ImmutableNeighbor(enterPoint, VectorValues.distance(query, vectorValues.vectorValue(), distFunc));
+    FurthestNeighbors neighbors = new FurthestNeighbors(ef, ep);
+
+    final HNSWGraph hnswGraph = HNSWGraph.defaultGraph(this.distFunc);
+    for (int layer = graphValues.getMaxLevel(); layer > 0; --layer) {
+      visitedCount += hnswGraph.searchLayer(query, neighbors, 1, layer, vectorValues, graphValues);
+    }
+
+    visitedCount += hnswGraph.searchLayer(query, neighbors, ef, 0, vectorValues, graphValues);
+    return neighbors;
   }
 
   public Neighbors searchNeighbors(float[] query, int ef, VectorValues vectorValues) throws IOException {

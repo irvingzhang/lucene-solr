@@ -120,7 +120,7 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
     System.out.println("[***" + type.toString() + "***] Total number of docs -> " + numDoc +
         ", dimension -> " + dimension + (type == VectorValues.VectorIndexType.IVFFLAT ? (", nprobe -> " + centroid) : "")
         + ", number of recall experiments -> " + queryDataset.size() +
-        ", Top1 exact recall times -> " + totalRecallCnt + ", total search time -> " +
+        ", exact recall times -> " + totalRecallCnt + ", total search time -> " +
         totalCostTime + "msec, avg search time -> " + 1.0F * totalCostTime / queryDataset.size() +
         "msec, recall percent -> " + 100.0F * totalRecallCnt / (queryDataset.size() * topK) + "%");
   }

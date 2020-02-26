@@ -19,12 +19,12 @@ package org.apache.lucene.util.hnsw;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.lucene.index.KnnGraphValues;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.IntsRef;
@@ -46,6 +46,70 @@ public final class HNSWGraph implements Accountable {
   public HNSWGraph(VectorValues.DistanceFunction distFunc) {
     this.distFunc = distFunc;
     this.layers = new ArrayList<>();
+  }
+
+  private static final class HNSWGraphHolder {
+    public static final HNSWGraph MANHATTAN_HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.MANHATTAN);
+
+    public static final HNSWGraph EUCLIDEAN_HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.EUCLIDEAN);
+
+    public static final HNSWGraph COSINE_HNSW_HOLDER = new HNSWGraph(VectorValues.DistanceFunction.COSINE);
+  }
+
+  /** Lazy initialization. */
+  public static HNSWGraph defaultGraph(VectorValues.DistanceFunction distFunc) {
+    switch (distFunc) {
+      case EUCLIDEAN:
+        return HNSWGraphHolder.EUCLIDEAN_HNSW_HOLDER;
+
+      case COSINE:
+        return HNSWGraphHolder.COSINE_HNSW_HOLDER;
+
+      default:
+        return HNSWGraphHolder.MANHATTAN_HNSW_HOLDER;
+    }
+  }
+
+  int searchLayer(final float[] query, final FurthestNeighbors results, int ef, int level, final VectorValues vectorValues,
+                          final KnnGraphValues graphValues) throws IOException {
+    final TreeSet<Neighbor> candidates = new TreeSet<>();
+    // set of docids that have been visited by search on this layer, used to avoid backtracking
+    final Set<Integer> visited = new HashSet<>();
+    for (Neighbor n : results) {
+      candidates.add(n);
+      visited.add(n.docId());
+    }
+
+    Neighbor f = results.top();
+    while (candidates.size() > 0) {
+      Neighbor c = candidates.pollFirst();
+      assert c != null;
+      assert !c.isDeferred();
+      assert !f.isDeferred();
+      if (c.distance() > f.distance() && results.size() >= ef) {
+        break;
+      }
+
+      graphValues.advance(c.docId());
+      final IntsRef friends = graphValues.getFriends(level);
+      for (int idx = 0; idx < friends.length; ++idx) {
+        int docID = friends.ints[idx];
+        if (visited.contains(docID)) {
+          continue;
+        }
+
+        visited.add(docID);
+        float dist = distance(query, docID, vectorValues);
+        if (dist < f.distance() || results.size() < ef) {
+          Neighbor n = new ImmutableNeighbor(docID, dist);
+          candidates.add(n);
+          results.insertWithOverflow(n);
+          f = results.top();
+        }
+      }
+    }
+
+    return visited.size();
   }
 
   /**
@@ -73,8 +137,9 @@ public final class HNSWGraph implements Accountable {
     Neighbor f = results.top();
     while (candidates.size() > 0) {
       Neighbor c = candidates.pollFirst();
-      assert c.isDeferred() == false;
-      assert f.isDeferred() == false;
+      assert c != null;
+      assert !c.isDeferred();
+      assert !f.isDeferred();
       if (c.distance() > f.distance() && results.size() >= ef) {
         break;
       }
@@ -112,6 +177,7 @@ public final class HNSWGraph implements Accountable {
     int ef = queue.size();
     while (addedDocs.size() < ef && queue.size() > 0) {
       Neighbor c = queue.pop();
+      assert c != null;
       if (!addedDocs.contains(c.docId())) {
         nearests.add(c);
         addedDocs.add(c.docId());
@@ -235,7 +301,7 @@ public final class HNSWGraph implements Accountable {
   }
 
   public void finish() {
-    while (layers.isEmpty() == false && layers.get(layers.size() - 1).size() == 0) {
+    while (!layers.isEmpty() && layers.get(layers.size() - 1).size() == 0) {
       // remove empty top layers
       layers.remove(layers.size() - 1);
     }
