@@ -62,10 +62,10 @@ public final class HNSWGraphReader {
     }
 
     final Neighbor ep = new ImmutableNeighbor(enterPoint, VectorValues.distance(query, vectorValues.vectorValue(), distFunc));
-    FurthestNeighbors neighbors = new FurthestNeighbors(ef, ep);
+    final FurthestNeighbors neighbors = new FurthestNeighbors(ef, ep);
 
     final HNSWGraph hnswGraph = HNSWGraph.defaultGraph(this.distFunc);
-    for (int layer = graphValues.getMaxLevel(); layer > 0; --layer) {
+    for (int layer = graphValues.getTopLevel() - 1; layer > 0; --layer) {
       visitedCount += hnswGraph.searchLayer(query, neighbors, 1, layer, vectorValues, graphValues);
     }
 

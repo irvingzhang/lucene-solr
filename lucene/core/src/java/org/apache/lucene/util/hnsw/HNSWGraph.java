@@ -98,16 +98,18 @@ public final class HNSWGraph implements Accountable {
       final IntsRef friends = graphValues.getFriends(level);
       for (int idx = 0; idx < friends.length; ++idx) {
         int docID = friends.ints[idx];
-        if (visited.contains(docID)) {
+        if (!visited.add(docID)) {
           continue;
         }
 
-        visited.add(docID);
         float dist = distance(query, docID, vectorValues);
         if (dist < f.distance() || results.size() < ef) {
+          if (results.size() == ef) {
+            results.pop();
+          }
           Neighbor n = new ImmutableNeighbor(docID, dist);
           candidates.add(n);
-          results.insertWithOverflow(n);
+          results.add(n);
           f = results.top();
         }
       }
@@ -148,15 +150,18 @@ public final class HNSWGraph implements Accountable {
         break;
       }
       for (Neighbor e : layer.getFriends(c.docId())) {
-        if (visited.contains(e.docId())) {
+        if (!visited.add(e.docId())) {
           continue;
         }
-        visited.add(e.docId());
+
         float dist = distance(query, e.docId(), vectorValues);
         if (dist < f.distance() || results.size() < ef) {
+          if (results.size() == ef) {
+            results.pop();
+          }
           Neighbor n = new ImmutableNeighbor(e.docId(), dist);
           candidates.add(n);
-          results.insertWithOverflow(n);
+          results.add(n);
           f = results.top();
         }
       }
