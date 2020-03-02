@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.DocValuesConsumer;
 import org.apache.lucene.codecs.FieldsConsumer;
+import org.apache.lucene.codecs.IvfFlatIndexWriter;
 import org.apache.lucene.codecs.NormsConsumer;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsWriter;
@@ -99,15 +100,8 @@ final class SegmentMerger {
       throw new IllegalStateException("Merge would result in 0 document segment");
     }
     mergeFieldInfos();
-    long t0 = 0;
-    if (mergeState.infoStream.isEnabled("SM")) {
-      t0 = System.nanoTime();
-    }
-    int numMerged = mergeFields();
-    if (mergeState.infoStream.isEnabled("SM")) {
-      long t1 = System.nanoTime();
-      mergeState.infoStream.message("SM", ((t1-t0)/1000000) + " msec to merge stored fields [" + numMerged + " docs]");
-    }
+
+    int numMerged = mergeWithLogging(this::mergeFields, "stored fields");
     assert numMerged == mergeState.segmentInfo.maxDoc(): "numMerged=" + numMerged + " vs mergeState.segmentInfo.maxDoc()=" + mergeState.segmentInfo.maxDoc();
 
     final SegmentWriteState segmentWriteState = new SegmentWriteState(mergeState.infoStream, directory, mergeState.segmentInfo,
@@ -116,77 +110,29 @@ final class SegmentMerger {
         true, IOContext.READ, segmentWriteState.segmentSuffix, Collections.emptyMap());
 
     if (mergeState.mergeFieldInfos.hasNorms()) {
-      if (mergeState.infoStream.isEnabled("SM")) {
-        t0 = System.nanoTime();
-      }
-      mergeNorms(segmentWriteState);
-      if (mergeState.infoStream.isEnabled("SM")) {
-        long t1 = System.nanoTime();
-        mergeState.infoStream.message("SM", ((t1-t0)/1000000) + " msec to merge norms [" + numMerged + " docs]");
-      }
+      mergeWithLogging(() -> mergeNorms(segmentWriteState), "norms", numMerged);
     }
 
-    if (mergeState.infoStream.isEnabled("SM")) {
-      t0 = System.nanoTime();
-    }
-    try (NormsProducer norms = mergeState.mergeFieldInfos.hasNorms()
-        ? codec.normsFormat().normsProducer(segmentReadState)
-        : null) {
-      NormsProducer normsMergeInstance = null;
-      if (norms != null) {
-        // Use the merge instance in order to reuse the same IndexInput for all terms
-        normsMergeInstance = norms.getMergeInstance();
-      }
-      mergeTerms(segmentWriteState, normsMergeInstance);
-    }
-    if (mergeState.infoStream.isEnabled("SM")) {
-      long t1 = System.nanoTime();
-      mergeState.infoStream.message("SM", ((t1-t0)/1000000) + " msec to merge postings [" + numMerged + " docs]");
-    }
+    mergeWithLogging(() -> mergeTerms(segmentWriteState, segmentReadState), "postings", numMerged);
 
-    if (mergeState.infoStream.isEnabled("SM")) {
-      t0 = System.nanoTime();
-    }
     if (mergeState.mergeFieldInfos.hasDocValues()) {
-      mergeDocValues(segmentWriteState);
-    }
-    if (mergeState.infoStream.isEnabled("SM")) {
-      long t1 = System.nanoTime();
-      mergeState.infoStream.message("SM", ((t1-t0)/1000000) + " msec to merge doc values [" + numMerged + " docs]");
+      mergeWithLogging(() -> mergeDocValues(segmentWriteState), "doc values", numMerged);
     }
 
-    if (mergeState.infoStream.isEnabled("SM")) {
-      t0 = System.nanoTime();
-    }
     if (mergeState.mergeFieldInfos.hasPointValues()) {
-      mergePoints(segmentWriteState);
+      mergeWithLogging(() -> mergePoints(segmentWriteState), "points", numMerged);
     }
-    if (mergeState.infoStream.isEnabled("SM")) {
-      long t1 = System.nanoTime();
-      mergeState.infoStream.message("SM", ((t1-t0)/1000000) + " msec to merge points [" + numMerged + " docs]");
+
+    if (mergeState.mergeFieldInfos.hasIvfFlatAndVectorValues()) {
+        mergeWithLogging(() -> mergeIvfFlatValues(segmentWriteState), "ivfflat", numMerged);
     }
 
     if (mergeState.mergeFieldInfos.hasVectors()) {
-      if (mergeState.infoStream.isEnabled("SM")) {
-        t0 = System.nanoTime();
-      }
-      numMerged = mergeVectors();
-      if (mergeState.infoStream.isEnabled("SM")) {
-        long t1 = System.nanoTime();
-        mergeState.infoStream.message("SM", ((t1-t0)/1000000) + " msec to merge vectors [" + numMerged + " docs]");
-      }
-      assert numMerged == mergeState.segmentInfo.maxDoc();
+      mergeWithLogging(this::mergeVectors, "term vectors");
     }
-    
+
     // write the merged infos
-    if (mergeState.infoStream.isEnabled("SM")) {
-      t0 = System.nanoTime();
-    }
-    codec.fieldInfosFormat().write(directory, mergeState.segmentInfo, "", mergeState.mergeFieldInfos, context);
-    if (mergeState.infoStream.isEnabled("SM")) {
-      long t1 = System.nanoTime();
-      mergeState.infoStream.message("SM", ((t1-t0)/1000000) + " msec to write field infos [" + numMerged + " docs]");
-    }
+    mergeWithLogging(() -> codec.fieldInfosFormat().write(directory, mergeState.segmentInfo, "", mergeState.mergeFieldInfos, context), "field infos", numMerged);
 
     return mergeState;
   }
@@ -208,7 +154,22 @@ final class SegmentMerger {
       consumer.merge(mergeState);
     }
   }
-  
+
+  private void mergeTerms(SegmentWriteState segmentWriteState, SegmentReadState segmentReadState) throws IOException {
+    try (NormsProducer norms = mergeState.mergeFieldInfos.hasNorms()
+        ? codec.normsFormat().normsProducer(segmentReadState)
+        : null) {
+      NormsProducer normsMergeInstance = null;
+      if (norms != null) {
+        // Use the merge instance in order to reuse the same IndexInput for all terms
+        normsMergeInstance = norms.getMergeInstance();
+      }
+      try (FieldsConsumer consumer = codec.postingsFormat().fieldsConsumer(segmentWriteState)) {
+        consumer.merge(mergeState, normsMergeInstance);
+      }
+    }
+  }
+
   public void mergeFieldInfos() throws IOException {
     for (FieldInfos readerFieldInfos : mergeState.fieldInfos) {
       for (FieldInfo fi : readerFieldInfos) {
@@ -236,13 +197,49 @@ final class SegmentMerger {
    */
   private int mergeVectors() throws IOException {
     try (TermVectorsWriter termVectorsWriter = codec.termVectorsFormat().vectorsWriter(directory, mergeState.segmentInfo, context)) {
-      return termVectorsWriter.merge(mergeState);
+      int numMerged = termVectorsWriter.merge(mergeState);
+      assert numMerged == mergeState.segmentInfo.maxDoc();
+      return numMerged;
     }
   }
 
-  private void mergeTerms(SegmentWriteState segmentWriteState, NormsProducer norms) throws IOException {
-    try (FieldsConsumer consumer = codec.postingsFormat().fieldsConsumer(segmentWriteState)) {
-      consumer.merge(mergeState, norms);
+  private void mergeIvfFlatValues(SegmentWriteState segmentWriteState) throws IOException {
+    try (IvfFlatIndexWriter writer = codec.ivfFlatIndexFormat().fieldsWriter(segmentWriteState)) {
+      writer.merge(mergeState);
     }
   }
+
+  private interface Merger {
+    int merge() throws IOException;
+  }
+
+  private interface VoidMerger {
+    void merge() throws IOException;
+  }
+
+  private int mergeWithLogging(Merger merger, String formatName) throws IOException {
+    long t0 = 0;
+    if (mergeState.infoStream.isEnabled("SM")) {
+      t0 = System.nanoTime();
+    }
+    int numMerged = merger.merge();
+    if (mergeState.infoStream.isEnabled("SM")) {
+      long t1 = System.nanoTime();
+      mergeState.infoStream.message("SM", ((t1 - t0) / 1000000) + " msec to merge vector values [" + numMerged + " docs]");
+    }
+    return numMerged;
+  }
+
+  private void mergeWithLogging(VoidMerger merger, String formatName, int numMerged) throws IOException {
+    long t0 = 0;
+    if (mergeState.infoStream.isEnabled("SM")) {
+      t0 = System.nanoTime();
+    }
+    merger.merge();
+    if (mergeState.infoStream.isEnabled("SM")) {
+      long t1 = System.nanoTime();
+      mergeState.infoStream.message("SM", ((t1 - t0) / 1000000) + " msec to merge vector values [" + numMerged + " docs]");
+    }
+  }
+
 }

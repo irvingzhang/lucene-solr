@@ -54,6 +54,10 @@ public final class FieldInfo {
   private int pointIndexDimensionCount;
   private int pointNumBytes;
 
+  private int vectorNumDimensions;  // if it is a positive value, it means this field indexes vectors
+  private VectorValues.DistanceFunction vectorDistFunc = VectorValues.DistanceFunction.NONE;
+  private VectorValues.VectorIndexType vectorIndexType = VectorValues.VectorIndexType.NONE;
+
   // whether this field is used as the soft-deletes field
   private final boolean softDeletesField;
 
@@ -64,7 +68,9 @@ public final class FieldInfo {
    */
   public FieldInfo(String name, int number, boolean storeTermVector, boolean omitNorms, boolean storePayloads,
                    IndexOptions indexOptions, DocValuesType docValues, long dvGen, Map<String,String> attributes,
-                   int pointDimensionCount, int pointIndexDimensionCount, int pointNumBytes, boolean softDeletesField) {
+                   int pointDataDimensionCount, int pointIndexDimensionCount, int pointNumBytes,
+                   int vectorNumDimensions, VectorValues.DistanceFunction vectorDistFunc,
+                   VectorValues.VectorIndexType vectorIndexType, boolean softDeletesField) {
     this.name = Objects.requireNonNull(name);
     this.number = number;
     this.docValuesType = Objects.requireNonNull(docValues, "DocValuesType must not be null (field: \"" + name + "\")");
@@ -83,6 +89,9 @@ public final class FieldInfo {
     this.pointDimensionCount = pointDimensionCount;
     this.pointIndexDimensionCount = pointIndexDimensionCount;
     this.pointNumBytes = pointNumBytes;
+    this.vectorNumDimensions = vectorNumDimensions;
+    this.vectorDistFunc = vectorDistFunc;
+    this.vectorIndexType = vectorIndexType;
     this.softDeletesField = softDeletesField;
     assert checkConsistency();
   }
@@ -135,6 +144,15 @@ public final class FieldInfo {
     
     if (dvGen != -1 && docValuesType == DocValuesType.NONE) {
       throw new IllegalStateException("field '" + name + "' cannot have a docvalues update generation without having docvalues");
+    }
+
+    if (vectorNumDimensions < 0) {
+      throw new IllegalStateException("vectorNumDimensions must be >=0; got " + vectorNumDimensions);
+    }
+
+    if (vectorNumDimensions == 0 && (vectorDistFunc != VectorValues.DistanceFunction.NONE
+        || vectorIndexType != VectorValues.VectorIndexType.NONE)) {
+      throw new IllegalStateException("vectorDistFunc must be NONE when vectorNumDimensions = 0; got " + vectorDistFunc);
     }
 
     return true;
@@ -230,6 +248,51 @@ public final class FieldInfo {
   /** Return number of bytes per dimension */
   public int getPointNumBytes() {
     return pointNumBytes;
+  }
+
+  /** Record that this field is indexed with vectors, with the specified num of dimensions and distance function */
+  public void setVectorDimensionsAndDistanceFunction(int numDimensions, VectorValues.DistanceFunction distFunc) {
+    if (numDimensions < 0) {
+      throw new IllegalArgumentException("vector numDimensions must be >= 0; got " + numDimensions);
+    }
+    if (numDimensions > VectorValues.MAX_DIMENSIONS) {
+      throw new IllegalArgumentException("vector numDimensions must be <= VectorValues.MAX_DIMENSIONS (=" + VectorValues.MAX_DIMENSIONS + "); got " + numDimensions);
+    }
+    if (numDimensions == 0 && distFunc != VectorValues.DistanceFunction.NONE) {
+      throw new IllegalArgumentException("vector distFunc must be NONE when the vector numDimensions = 0; got " + distFunc);
+    }
+    if (vectorNumDimensions != 0 && vectorNumDimensions != numDimensions) {
+      throw new IllegalArgumentException("cannot change vector numDimensions from " + vectorNumDimensions + " to " + numDimensions + " for field=\"" + name + "\"");
+    }
+    if (vectorDistFunc != VectorValues.DistanceFunction.NONE && vectorDistFunc != distFunc) {
+      throw new IllegalArgumentException("cannot change vector distFunc from " + vectorDistFunc + " to " + vectorDistFunc + " for field=\"" + name + "\"");
+    }
+
+    this.vectorNumDimensions = numDimensions;
+    this.vectorDistFunc = distFunc;
+
+    assert checkConsistency();
+  }
+
+  public void setVecDimsAndDistFuncAndIndexType(int dims, VectorValues.DistanceFunction distFunc,
+                                                VectorValues.VectorIndexType indexType) {
+    this.vectorIndexType = indexType;
+    this.setVectorDimensionsAndDistanceFunction(dims, distFunc);
+  }
+
+  /** Returns the number of dimensions of the vector value */
+  public int getVectorNumDimensions() {
+    return vectorNumDimensions;
+  }
+
+  /** Returns the index type of vectors **/
+  public VectorValues.VectorIndexType getVectorIndexType() {
+    return vectorIndexType;
+  }
+
+  /** Returns {@link org.apache.lucene.index.VectorValues.DistanceFunction} for the field */
+  public VectorValues.DistanceFunction getVectorDistFunc() {
+    return vectorDistFunc;
   }
 
   /** Record that this field is indexed with docvalues, with the specified type */
@@ -333,6 +396,13 @@ public final class FieldInfo {
    */
   public boolean hasVectors() {
     return storeTermVector;
+  }
+
+  /**
+   * @return true if any (numeric) vector values exist for this field
+   */
+  public boolean hasVectorValues() {
+    return vectorNumDimensions > 0;
   }
   
   /**

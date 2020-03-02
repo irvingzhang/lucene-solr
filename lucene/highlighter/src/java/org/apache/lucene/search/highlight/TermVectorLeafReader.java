@@ -26,6 +26,7 @@ import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexOptions;
+import org.apache.lucene.index.IvfFlatValues;
 import org.apache.lucene.index.LeafMetaData;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.NumericDocValues;
@@ -35,6 +36,7 @@ import org.apache.lucene.index.SortedNumericDocValues;
 import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.StoredFieldVisitor;
 import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.Version;
 
@@ -81,7 +83,9 @@ public class TermVectorLeafReader extends LeafReader {
     }
     FieldInfo fieldInfo = new FieldInfo(field, 0,
                                         true, true, terms.hasPayloads(),
-                                        indexOptions, DocValuesType.NONE, -1, Collections.emptyMap(), 0, 0, 0, false);
+                                        indexOptions, DocValuesType.NONE, -1, Collections.emptyMap(),
+        0, 0, 0, 0, VectorValues.DistanceFunction.NONE,
+        VectorValues.VectorIndexType.NONE, false);
     fieldInfos = new FieldInfos(new FieldInfo[]{fieldInfo});
   }
 
@@ -136,6 +140,21 @@ public class TermVectorLeafReader extends LeafReader {
 
   @Override
   public PointValues getPointValues(String fieldName) {
+    return null;
+  }
+
+  @Override
+  public VectorValues getVectorValues(String fieldName) {
+    return null;
+  }
+
+  /**
+   * Returns the {@link IvfFlatValues} for the given {@code field}
+   *
+   * @param field field name for retrieval
+   */
+  @Override
+  public IvfFlatValues getIvfFlatValues(String field) {
     return null;
   }
 

@@ -24,6 +24,7 @@ import java.util.Locale;
 
 import org.apache.lucene.codecs.DocValuesProducer;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsReader;
 import org.apache.lucene.codecs.StoredFieldsReader;
@@ -77,6 +78,8 @@ public class MergeState {
   /** Point readers to merge */
   public final PointsReader[] pointsReaders;
 
+  public final IvfFlatIndexReader[] ivfFlatIndexReaders;
+
   /** Max docs per reader */
   public final int[] maxDocs;
 
@@ -103,6 +106,7 @@ public class MergeState {
     termVectorsReaders = new TermVectorsReader[numReaders];
     docValuesProducers = new DocValuesProducer[numReaders];
     pointsReaders = new PointsReader[numReaders];
+    ivfFlatIndexReaders = new IvfFlatIndexReader[numReaders];
     fieldInfos = new FieldInfos[numReaders];
     liveDocs = new Bits[numReaders];
 
@@ -139,6 +143,12 @@ public class MergeState {
       if (pointsReaders[i] != null) {
         pointsReaders[i] = pointsReaders[i].getMergeInstance();
       }
+
+      ivfFlatIndexReaders[i] = reader.getIvfFlatIndexReader();
+      if (ivfFlatIndexReaders[i] != null) {
+        ivfFlatIndexReaders[i] = ivfFlatIndexReaders[i].getMergeInstance();
+      }
+
       numDocs += reader.numDocs();
     }
 

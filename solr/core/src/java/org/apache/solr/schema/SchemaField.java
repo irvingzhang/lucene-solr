@@ -26,6 +26,7 @@ import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.IndexableFieldType;
+import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.search.SortField;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -445,6 +446,26 @@ public final class SchemaField extends FieldProperties implements IndexableField
   @Override
   public int pointNumBytes() {
     return 0;
+  }
+
+  @Override
+  public int vectorNumDimensions() {
+    return 0;
+  }
+
+  @Override
+  public VectorValues.DistanceFunction vectorDistFunc() {
+    return VectorValues.DistanceFunction.NONE;
+  }
+
+  /**
+   * The {@link VectorValues.VectorIndexType} of the field's vector index type
+   *
+   * @return
+   */
+  @Override
+  public VectorValues.VectorIndexType vectorIndexType() {
+    return VectorValues.VectorIndexType.NONE;
   }
 
   @Override

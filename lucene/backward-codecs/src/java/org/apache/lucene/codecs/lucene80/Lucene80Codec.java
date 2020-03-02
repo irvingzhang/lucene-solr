@@ -20,6 +20,7 @@ import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.CompoundFormat;
 import org.apache.lucene.codecs.DocValuesFormat;
 import org.apache.lucene.codecs.FieldInfosFormat;
+import org.apache.lucene.codecs.IvfFlatIndexFormat;
 import org.apache.lucene.codecs.LiveDocsFormat;
 import org.apache.lucene.codecs.NormsFormat;
 import org.apache.lucene.codecs.PointsFormat;
@@ -127,5 +128,13 @@ public class Lucene80Codec extends Codec {
   @Override
   public final NormsFormat normsFormat() {
     return normsFormat;
+  }
+
+  /**
+   * Encodes/decodes ivfflat index
+   **/
+  @Override
+  public IvfFlatIndexFormat ivfFlatIndexFormat() {
+    return IvfFlatIndexFormat.EMPTY;
   }
 }

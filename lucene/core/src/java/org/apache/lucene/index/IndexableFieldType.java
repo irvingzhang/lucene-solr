@@ -115,6 +115,22 @@ public interface IndexableFieldType {
   public int pointNumBytes();
 
   /**
+   * The number of dimensions of the field's vector value
+   */
+  public int vectorNumDimensions();
+
+  /**
+   * The {@link org.apache.lucene.index.VectorValues.DistanceFunction} of the field's vector value
+   */
+  public VectorValues.DistanceFunction vectorDistFunc();
+
+  /**
+   * The {@link org.apache.lucene.index.VectorValues.VectorIndexType} of the field's vector index type
+   * @return
+   */
+  public VectorValues.VectorIndexType vectorIndexType();
+
+  /**
    * Attributes for the field type.
    *
    * Attributes are not thread-safe, user must not add attributes while other threads are indexing documents

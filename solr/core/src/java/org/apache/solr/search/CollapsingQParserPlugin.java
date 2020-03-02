@@ -445,6 +445,9 @@ public class CollapsingQParserPlugin extends QParserPlugin {
               fieldInfo.getPointDimensionCount(),
               fieldInfo.getPointIndexDimensionCount(),
               fieldInfo.getPointNumBytes(),
+              fieldInfo.getVectorNumDimensions(),
+              fieldInfo.getVectorDistFunc(),
+              fieldInfo.getVectorIndexType(),
               fieldInfo.isSoftDeletesField());
           newInfos.add(f);
         } else {

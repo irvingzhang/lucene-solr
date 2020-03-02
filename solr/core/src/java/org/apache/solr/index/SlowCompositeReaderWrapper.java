@@ -277,6 +277,16 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   }
 
   @Override
+  public VectorValues getVectorValues(String field) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public FieldInfos getFieldInfos() {
     return fieldInfos;
   }

@@ -331,10 +331,20 @@ public abstract class FilterLeafReader extends LeafReader {
   }
 
   @Override
+  public VectorValues getVectorValues(String field) throws IOException {
+    return in.getVectorValues(field);
+  }
+
+  @Override
   public Fields getTermVectors(int docID)
           throws IOException {
     ensureOpen();
     return in.getTermVectors(docID);
+  }
+
+  @Override
+  public IvfFlatValues getIvfFlatValues(final String field) throws IOException {
+    return in.getIvfFlatValues(field);
   }
 
   @Override

@@ -27,6 +27,7 @@ import org.apache.lucene.codecs.Codec;
 import org.apache.lucene.codecs.DocValuesProducer;
 import org.apache.lucene.codecs.FieldInfosFormat;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsReader;
 import org.apache.lucene.codecs.StoredFieldsReader;
@@ -258,6 +259,16 @@ public final class SegmentReader extends CodecReader {
   public DocValuesProducer getDocValuesReader() {
     ensureOpen();
     return docValuesProducer;
+  }
+
+  /**
+   * Expert: retrieve underlying IvfFlatIndexReader
+   *
+   * @lucene.internal
+   */
+  @Override
+  public IvfFlatIndexReader getIvfFlatIndexReader() {
+    return core.ivfFlatIndexReader;
   }
 
   @Override

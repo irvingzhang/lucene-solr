@@ -370,6 +370,26 @@ public class ParallelLeafReader extends LeafReader {
   }
 
   @Override
+  public VectorValues getVectorValues(String fieldName) throws IOException {
+    ensureOpen();
+    LeafReader reader = fieldToReader.get(fieldName);
+    return reader == null ? null : reader.getVectorValues(fieldName);
+  }
+
+  /**
+   * Returns the {@link IvfFlatValues} for the given {@code field}
+   *
+   * @param field
+   */
+  @Override
+  public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+    ensureOpen();
+    LeafReader reader = fieldToReader.get(field);
+
+    return reader == null ? null : reader.getIvfFlatValues(field);
+  }
+
+  @Override
   public void checkIntegrity() throws IOException {
     ensureOpen();
     for (LeafReader reader : completeReaderSet) {

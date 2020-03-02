@@ -195,6 +195,21 @@ class MergeReaderWrapper extends LeafReader {
   }
 
   @Override
+  public VectorValues getVectorValues(String fieldName) throws IOException {
+    return in.getVectorValues(fieldName);
+  }
+
+  /**
+   * Returns the {@link IvfFlatValues} for the given {@code field}
+   *
+   * @param field field name for retrieval
+   */
+  @Override
+  public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+    return in.getIvfFlatValues(field);
+  }
+
+  @Override
   public int numDocs() {
     return in.numDocs();
   }

@@ -1,0 +1,263 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.lucene.index;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
+import java.util.Arrays;
+import java.util.NoSuchElementException;
+
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.util.BytesRef;
+
+/**
+ * Access to per-document vector value.
+ */
+public abstract class VectorValues extends DocIdSetIterator {
+
+  public static int MAX_DIMENSIONS = 1024;
+
+  /** Sole constructor */
+  protected VectorValues() {}
+
+  /**
+   * Returns the vector value for the current document ID.
+   * It is illegal to call this method after {@link #seek(int)}
+   * returned {@code false}.
+   * @return vector value
+   */
+  public abstract float[] vectorValue() throws IOException;
+
+  /**
+   * Returns the binary encoded vector value for the current document ID.
+   * It is illegal to call this method after {@link #seek(int)}
+   * returned {@code false}.
+   * @return binary value
+   */
+  public BytesRef binaryValue() throws IOException {
+    return encode(vectorValue());
+  }
+
+  /** Move the pointer to exactly {@code target} and return whether
+   *  {@code target} has a value.
+   *  {@code target} must be a valid doc ID, ie. &ge; 0 and &lt; {@code maxDoc}.
+   *  After this method returns, {@link #docID()} retuns {@code target}. */
+  public abstract boolean seek(int target) throws IOException;
+
+  /**
+   * Calculates the distance between the two vectors with specified distance function.
+   */
+  public static float distance(float[] v1, float[] v2, DistanceFunction distFunc) {
+    if (v1.length != v2.length) {
+      throw new IllegalArgumentException("Incompatible number of dimensions: " + v1.length + ", " + v2.length);
+    }
+    return distFunc.distance(v1, v2);
+  }
+
+  /**
+   * Encodes float array to byte array.
+   */
+  public static BytesRef encode(float[] value) {
+    ByteBuffer buffer = ByteBuffer.allocate(Float.BYTES * value.length);
+    buffer.asFloatBuffer().put(value);
+    return new BytesRef(buffer.array());
+  }
+
+  public static boolean verifyNumDimensions(int numBytes, int numDims) {
+    if (numBytes % Float.BYTES != 0) {
+      throw new IllegalArgumentException("Cannot decode bytes array to float array. Reason: invalid length: " + numBytes);
+    }
+    int dims = numBytes / Float.BYTES;
+    if (dims != numDims) {
+      throw new IllegalArgumentException("Invalid dimensions: " + dims + " (the number of dimensions should be " + numDims + ")");
+    }
+    return true;
+  }
+
+  /**
+   * Decodes float array from byte array. TODO: allow caller to supply the array so they control allocation.
+   */
+  public static float[] decode(BytesRef bytes, int numDims) {
+    verifyNumDimensions(bytes.length, numDims);
+    float[] value = new float[numDims];
+    ByteBuffer buffer = ByteBuffer.wrap(bytes.bytes, bytes.offset, bytes.length);
+    buffer.asFloatBuffer().get(value);
+    return value;
+  }
+
+  public enum VectorIndexType {
+    NONE(0),
+
+    HNSW(1),
+
+    IVFFLAT(2);
+
+    private int id;
+
+    VectorIndexType(int id) {
+      this.id = id;
+    }
+
+    public int id() {
+      return this.id;
+    }
+
+    public static VectorIndexType fromId(int id) {
+      for (VectorIndexType type : VectorIndexType.values()) {
+        if (id == type.id) {
+          return type;
+        }
+      }
+
+      throw new NoSuchElementException("No such vector index type with id " + id);
+    }
+  }
+
+  /**
+   * Distance function. This is used when both of vector indexing and searching.
+   */
+  public enum DistanceFunction {
+    /** No distance function is used.
+     * Note: vector is not indexed for the field. */
+    NONE(0),
+
+    /** Manhattan distance */
+    MANHATTAN(1) {
+      @Override
+      public float distance(float[] v1, float[] v2) {
+        assert v1.length == v2.length;
+        if (Arrays.equals(v1, v2)) {
+          return 0.0f;
+        }
+        float d = 0.0f;
+        int dim = v1.length;
+        for (int i = 0; i < dim; i++) {
+          d += Math.abs(v1[i] - v2[i]);
+        }
+        return d;
+      }
+    },
+
+    /** Euclidean distance */
+    EUCLIDEAN(2) {
+      @Override
+      public float distance(float[] v1, float[] v2) {
+        assert v1.length == v2.length;
+        if (Arrays.equals(v1, v2)) {
+          return 0.0f;
+        }
+        float squareSum = 0.0f;
+        int dim = v1.length;
+        for (int i = 0; i < dim; i++) {
+          float diff = v1[i] - v2[i];
+          squareSum += diff * diff;
+        }
+        return (float)Math.sqrt(squareSum);
+      }
+    },
+
+    /** Cosine distance */
+    COSINE(3) {
+      @Override
+      public float distance(float[] v1, float[] v2) {
+        assert v1.length == v2.length;
+        if (Arrays.equals(v1, v2)) {
+          return 0.0f;
+        }
+        float sum = 0.0f;
+        float squareSum1 = 0.0f;
+        float squareSum2 = 0.0f;
+        int dim = v1.length;
+        for (int i = 0; i < dim; i++) {
+          sum += v1[i] * v2[i];
+          squareSum1 += v1[i] * v1[i];
+          squareSum2 += v2[i] * v2[i];
+        }
+        return 1.0f - sum / ((float)Math.sqrt(squareSum1) * (float)Math.sqrt(squareSum2));
+      }
+    };
+
+    /** ID for each enum value; this is supposed to be persisted to the index and cannot be changed after indexing. */
+    final int id;
+
+    /** Sole constructor */
+    DistanceFunction(int id) {
+      this.id = id;
+    }
+
+    /**
+     * Returns the id of the distance function.
+     * @return id
+     */
+    public int getId() {
+      return id;
+    }
+
+    /**
+     * Calculates the distance between the specified two vectors.
+     */
+    public float distance(float[] v1, float[] v2) {
+      throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Returns the distance function that is specified by the id.
+     */
+    public static DistanceFunction fromId(int id) {
+      for (DistanceFunction d : DistanceFunction.values()) {
+        if (d.id == id) {
+          return d;
+        }
+      }
+      throw new IllegalArgumentException("no such distance function with id " + id);
+    }
+  }
+
+  public static VectorValues EMPTY = new VectorValues() {
+    @Override
+    public float[] vectorValue() throws IOException {
+      return new float[0];
+    }
+
+    @Override
+    public boolean seek(int target) throws IOException {
+      return false;
+    }
+
+    @Override
+    public int docID() {
+      return -1;
+    }
+
+    @Override
+    public int nextDoc() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int advance(int target) throws IOException {
+      return -1;
+    }
+
+    @Override
+    public long cost() {
+      return 0;
+    }
+  };
+}

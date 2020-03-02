@@ -24,6 +24,7 @@ import java.util.Iterator;
 
 import org.apache.lucene.codecs.DocValuesProducer;
 import org.apache.lucene.codecs.FieldsProducer;
+import org.apache.lucene.codecs.IvfFlatIndexReader;
 import org.apache.lucene.codecs.NormsProducer;
 import org.apache.lucene.codecs.PointsReader;
 import org.apache.lucene.codecs.StoredFieldsReader;
@@ -76,6 +77,17 @@ public final class SlowCodecReaderWrapper {
         public DocValuesProducer getDocValuesReader() {
           reader.ensureOpen();
           return readerToDocValuesProducer(reader);
+        }
+
+        /**
+         * Expert: retrieve underlying IvfFlatIndexReader
+         *
+         * @lucene.internal
+         */
+        @Override
+        public IvfFlatIndexReader getIvfFlatIndexReader() {
+          reader.ensureOpen();
+          return readerToIvfFlatIndexRead(reader);
         }
 
         @Override
@@ -158,6 +170,40 @@ public final class SlowCodecReaderWrapper {
         return 0;
       }
 
+    };
+  }
+
+  private static IvfFlatIndexReader readerToIvfFlatIndexRead(LeafReader reader) {
+    return new IvfFlatIndexReader() {
+      @Override
+      public void checkIntegrity() {
+
+      }
+
+      @Override
+      public VectorValues getVectorValues(String field) throws IOException {
+        return reader.getVectorValues(field);
+      }
+
+      /**
+       * Returns the {@link IvfFlatValues} for the given {@code field}
+       *
+       * @param field
+       */
+      @Override
+      public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+        return reader.getIvfFlatValues(field);
+      }
+
+      @Override
+      public void close() {
+
+      }
+
+      @Override
+      public long ramBytesUsed() {
+        return 0L;
+      }
     };
   }
   
