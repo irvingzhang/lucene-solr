@@ -70,7 +70,7 @@ public class KnnIvfPerformTester extends LuceneTestCase {
       for (int i = 0; !success && i < 10; ++i) { /// max retry 10 times
         success = runCase(siftDataset.size(), siftDataset.get(0).length,
             siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects,
-            new int[]{8, 16, 32, 64, 128, 256});
+            new int[]{16, 32, 64, 128, 256, 512});
       }
     } catch (IOException e) {
       e.printStackTrace();
@@ -85,7 +85,7 @@ public class KnnIvfPerformTester extends LuceneTestCase {
 
     try (Directory dir = FSDirectory.open(Paths.get(indexDir)); IndexWriter iw = new IndexWriter(
         dir, new IndexWriterConfig(new StandardAnalyzer()).setSimilarity(new AssertingSimilarity(new RandomSimilarity(new Random())))
-        .setMaxBufferedDocs(200000).setRAMBufferSizeMB(16).setMergeScheduler(new SerialMergeScheduler()).setUseCompoundFile(false)
+        .setMaxBufferedDocs(1500000).setRAMBufferSizeMB(4096).setMergeScheduler(new SerialMergeScheduler()).setUseCompoundFile(false)
         .setReaderPooling(false).setCodec(Codec.forName("Lucene90")))) {
       long addStartTime = System.currentTimeMillis();
       for (int i = 0; i < numDoc; ++i) {

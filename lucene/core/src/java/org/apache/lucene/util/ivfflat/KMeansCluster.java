@@ -83,8 +83,8 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
       this.k = 1048576;
     }
 
-    /// ensure each cluster has 128 points in average
-    int trainingSize = Math.min(collectionSize, this.k << 7);
+    /// ensure each cluster has 32 points in average
+    int trainingSize = Math.min(collectionSize, this.k << 5);
 
     if (trainingSize < collectionSize) {
       /// shuffle the whole collection
