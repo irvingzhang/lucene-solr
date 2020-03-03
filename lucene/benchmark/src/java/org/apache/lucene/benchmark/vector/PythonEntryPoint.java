@@ -103,7 +103,7 @@ public class PythonEntryPoint {
     final IndexSearcher searcher = new IndexSearcher(indexReader);
 
     final float[] value = convertToArray(query);
-    final KnnIvfFlatQuery graphQuery = new KnnIvfFlatQuery(VECTOR_FIELD, value, nProbe);
+    final KnnIvfFlatQuery graphQuery = new KnnIvfFlatQuery(VECTOR_FIELD, value, k, nProbe);
 
     final TopDocs topDocs = searcher.search(graphQuery, k);
 
