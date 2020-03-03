@@ -39,7 +39,7 @@ public final class VectorField extends Field {
   }
 
   public VectorField(String name, float[] vector, VectorValues.DistanceFunction distFunc) {
-    this(name, vector, distFunc, VectorValues.VectorIndexType.HNSW);
+    this(name, vector, distFunc, VectorValues.VectorIndexType.IVFFLAT);
   }
 
   public VectorField(String name, float[] vector, VectorValues.DistanceFunction distFunc,
