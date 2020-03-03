@@ -31,6 +31,7 @@ dependencies {
   implementation "org.apache.commons:commons-compress"
   implementation "com.ibm.icu:icu4j"
   implementation "org.locationtech.spatial4j:spatial4j"
+  implementation "net.sf.py4j:py4j"
   implementation("net.sourceforge.nekohtml:nekohtml", {
     exclude module: "xml-apis"
   })
