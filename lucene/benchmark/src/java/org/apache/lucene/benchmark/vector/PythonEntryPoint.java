@@ -17,14 +17,11 @@
 
 package org.apache.lucene.benchmark.vector;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -47,7 +44,7 @@ import org.apache.lucene.store.NIOFSDirectory;
 import py4j.GatewayServer;
 
 public class PythonEntryPoint {
-  private static final String INDEX_NAME = "/tmp/ivfflat";
+  private static final String INDEX_NAME = "ivfflat-index";
 
   private static final String ID_FIELD = "id";
 
@@ -70,26 +67,27 @@ public class PythonEntryPoint {
   public void prepareIndex(String function) throws IOException {
     this.distanceFunction = VectorValues.DistanceFunction.valueOf(function);
 
-    safeDelete(INDEX_NAME);
-
-    this.directory = NIOFSDirectory.open(Paths.get(INDEX_NAME));
+    Path indexPath = Files.createTempDirectory(INDEX_NAME);
+    this.directory = NIOFSDirectory.open(indexPath);
 
     this.indexWriter = new IndexWriter(directory, new IndexWriterConfig().setOpenMode(
-        IndexWriterConfig.OpenMode.CREATE).setCodec(Codec.forName("Lucene90")));
+        IndexWriterConfig.OpenMode.CREATE).setCodec(Codec.forName("Lucene90")).setMaxBufferedDocs(2000000)
+        .setRAMBufferSizeMB(4096));
   }
 
-  public void indexBatch(int startId, final List<List<Number>> vectors) throws IOException {
+  public void indexBatch(int startId, byte[] data) throws IOException {
+    float[][] matrix = createFromPy4j(data);
     int id = startId;
-    for (List<Number> vector : vectors) {
+    for (float[] floats : matrix) {
       final Document doc = new Document();
       doc.add(new StoredField(ID_FIELD, id++));
-
-      final float[] point = convertToArray(vector);
-      doc.add(new VectorField(VECTOR_FIELD, point, distanceFunction));
+      doc.add(new VectorField(VECTOR_FIELD, floats, distanceFunction));
       indexWriter.addDocument(doc);
     }
+  }
 
-    indexWriter.flush();
+  public void commit() throws IOException {
+    indexWriter.commit();
   }
 
   public void forceMerge() throws IOException {
@@ -121,19 +119,22 @@ public class PythonEntryPoint {
     return result;
   }
 
+  public float[][] createFromPy4j(byte[] data) {
+    ByteBuffer buffer = ByteBuffer.wrap(data);
+    int n = buffer.getInt(), m = buffer.getInt();
+    float[][] matrix = new float[n][m];
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < m; ++j) {
+        matrix[i][j] = buffer.getFloat();
+      }
+    }
+
+    return matrix;
+  }
+
   private float[] convertToArray(final List<Number> vector) {
     final float[] point = new float[vector.size()];
     IntStream.range(0, vector.size()).forEach(i -> point[i] = vector.get(i).floatValue());
     return point;
-  }
-
-  private static void safeDelete(final String indexDir) {
-    try {
-      Files.walk(Paths.get(indexDir)).sorted(Comparator.reverseOrder())
-          .map(Path::toFile).forEach(File::deleteOnExit);
-    } catch (NoSuchFileException ignored) {
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
   }
 }

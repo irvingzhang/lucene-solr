@@ -71,13 +71,18 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   @Override
   public List<Centroid<T>> cluster(List<T> trainingPoints) throws NoSuchElementException {
     int collectionSize = trainingPoints.size();
-    /// Reference: https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index#how-big-is-the-dataset
-    if (collectionSize <= 1E6) {
+    /// A useful reference: https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index#how-big-is-the-dataset
+    /// but we do not completely follow the suggests
+    if (collectionSize <= 2E6) {
       this.k = Math.min(collectionSize, (int) Math.sqrt(collectionSize) << 2);
-    } else if (collectionSize < 1E7) { /// starting from here, training would be slow
+    } else if (collectionSize <= 5E6) {
+      this.k = 10240;
+    } else if (collectionSize <= 1E7) { /// starting from here, training would be slow
       /// TODO IVF in combination with HNSW uses HNSW to do the cluster assignment
+      this.k = 32768;
+    } else if (collectionSize <= 5E7) {
       this.k = 65536;
-    } else if (collectionSize < 1E8) { /// not recommend training on so large data sets
+    } else if (collectionSize <= 1E8) { /// not recommend training on so large data sets
       this.k = 262144;
     } else {
       this.k = 1048576;
