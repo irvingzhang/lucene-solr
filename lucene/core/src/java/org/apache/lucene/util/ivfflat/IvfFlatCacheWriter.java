@@ -46,7 +46,7 @@ public final class IvfFlatCacheWriter implements Accountable {
     this.clusterer = new KMeansCluster<>(distFunc);
   }
 
-  /** Inserts a doc with vector value to the graph */
+  /** Inserts a doc with vector value. */
   public void insert(int docId, BytesRef binaryValue) {
     // add the vector value
     float[] value = VectorValues.decode(binaryValue, numDimensions);
@@ -64,12 +64,9 @@ public final class IvfFlatCacheWriter implements Accountable {
     ivFFlatIndex.finish();
   }
 
-  public List<IvfFlatIndex.ClusteredPoints> cluster(List<ImmutableClusterableVector>
+  public List<Centroid<ImmutableClusterableVector>> cluster(List<ImmutableClusterableVector>
                                                         immutableClusterableVectors) throws NoSuchElementException {
-    final List<Centroid<ImmutableClusterableVector>> clusteredPoints = clusterer.cluster(immutableClusterableVectors);
-    assert !clusteredPoints.isEmpty();
-
-    return IvfFlatIndex.ClusteredPoints.convert(clusteredPoints);
+    return clusterer.cluster(immutableClusterableVectors);
   }
 
   public float[][] rawVectorsArray() {

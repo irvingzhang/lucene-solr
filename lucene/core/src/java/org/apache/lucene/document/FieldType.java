@@ -357,7 +357,8 @@ public class FieldType implements IndexableFieldType  {
     return dimensionNumBytes;
   }
 
-  public void setVectorDimensionsAndDistanceFunction(int numDimensions, VectorValues.DistanceFunction distFunc) {
+  public void setVecDimsAndDistFuncAndIndexType(int numDimensions, VectorValues.DistanceFunction distFunc,
+                                                VectorValues.VectorIndexType indexType) {
     if (numDimensions < 0) {
       throw new IllegalArgumentException("vector numDimensions must be >= 0; got " + numDimensions);
     }
@@ -370,11 +371,6 @@ public class FieldType implements IndexableFieldType  {
 
     this.vectorNumDimensions = numDimensions;
     this.vectorDistFunc = distFunc;
-  }
-
-  public void setVecDimsAndDistFuncAndIndexType(int dims, VectorValues.DistanceFunction distFunc,
-                                                VectorValues.VectorIndexType indexType) {
-    this.setVectorDimensionsAndDistanceFunction(dims, distFunc);
     this.vectorIndexType = indexType;
   }
 

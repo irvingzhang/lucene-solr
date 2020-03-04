@@ -40,6 +40,7 @@ import org.apache.lucene.search.KnnIvfFlatQuery;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.store.NIOFSDirectory;
 import py4j.GatewayServer;
 
@@ -68,7 +69,7 @@ public class PythonEntryPoint {
     this.distanceFunction = VectorValues.DistanceFunction.valueOf(function);
 
     Path indexPath = Files.createTempDirectory(INDEX_NAME);
-    this.directory = NIOFSDirectory.open(indexPath);
+    this.directory = MMapDirectory.open(indexPath);
 
     this.indexWriter = new IndexWriter(directory, new IndexWriterConfig().setOpenMode(
         IndexWriterConfig.OpenMode.CREATE).setCodec(Codec.forName("Lucene90")).setMaxBufferedDocs(2000000)

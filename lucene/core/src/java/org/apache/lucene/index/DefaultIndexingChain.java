@@ -703,7 +703,8 @@ final class DefaultIndexingChain extends DocConsumer {
     // Record dimensions and distance function for this field; this setter will throw IllegalArgExc if
     // the dimensions or distance function were already set to something different:
     if (fp.fieldInfo.getVectorNumDimensions() == 0) {
-      fieldInfos.globalFieldNumbers.setVectorDimensionsAndDistanceFunction(fp.fieldInfo.number, fp.fieldInfo.name, numDimensions, distFunc);
+      fieldInfos.globalFieldNumbers.setVectorDimsAndDistFuncAndIndexType(fp.fieldInfo.number,
+          fp.fieldInfo.name, numDimensions, distFunc, vectorIndexType);
     }
 
     fp.fieldInfo.setVecDimsAndDistFuncAndIndexType(numDimensions, distFunc, vectorIndexType);

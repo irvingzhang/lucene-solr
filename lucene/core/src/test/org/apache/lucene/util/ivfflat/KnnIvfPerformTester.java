@@ -70,7 +70,7 @@ public class KnnIvfPerformTester extends LuceneTestCase {
       for (int i = 0; !success && i < 10; ++i) { /// max retry 10 times
         success = runCase(siftDataset.size(), siftDataset.get(0).length,
             siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects,
-            new int[]{16, 32, 64, 128, 256, 512});
+            new int[]{5, 10, 20, 50, 100});
       }
     } catch (IOException e) {
       e.printStackTrace();

@@ -274,10 +274,13 @@ public class FieldInfos implements Iterable<FieldInfo> {
   static final class FieldVectorProperties {
     final int numDimensions;
     final VectorValues.DistanceFunction distFunc;
+    final VectorValues.VectorIndexType indexType;
 
-    FieldVectorProperties(int numDimensions, VectorValues.DistanceFunction distFunc) {
+    FieldVectorProperties(int numDimensions, VectorValues.DistanceFunction distFunc,
+                          VectorValues.VectorIndexType indexType) {
       this.numDimensions = numDimensions;
       this.distFunc = distFunc;
+      this.indexType = indexType;
     }
   }
   
@@ -319,7 +322,8 @@ public class FieldInfos implements Iterable<FieldInfo> {
      * number assigned if possible otherwise the first unassigned field number
      * is used as the field number.
      */
-    synchronized int addOrGet(String fieldName, int preferredFieldNumber, IndexOptions indexOptions, DocValuesType dvType, int dimensionCount, int indexDimensionCount, int dimensionNumBytes, int vectorNumDimensions, VectorValues.DistanceFunction distFunc, boolean isSoftDeletesField) {
+    synchronized int addOrGet(String fieldName, int preferredFieldNumber, IndexOptions indexOptions, DocValuesType dvType, int dimensionCount, int indexDimensionCount, int dimensionNumBytes, int vectorNumDimensions,
+                              VectorValues.DistanceFunction distFunc, VectorValues.VectorIndexType indexType, boolean isSoftDeletesField) {
       if (indexOptions != IndexOptions.NONE) {
         IndexOptions currentOpts = this.indexOptions.get(fieldName);
         if (currentOpts == null) {
@@ -362,7 +366,7 @@ public class FieldInfos implements Iterable<FieldInfo> {
             throw new IllegalArgumentException("cannot change distance function from " + props.distFunc + " to " + distFunc + " for field=\"" + fieldName + "\"");
           }
         } else {
-          vectorProps.put(fieldName, new FieldVectorProperties(vectorNumDimensions, distFunc));
+          vectorProps.put(fieldName, new FieldVectorProperties(vectorNumDimensions, distFunc, indexType));
         }
       }
       Integer fieldNumber = nameToNumber.get(fieldName);
@@ -510,7 +514,9 @@ public class FieldInfos implements Iterable<FieldInfo> {
       dimensions.put(name, new FieldDimensions(dimensionCount, indexDimensionCount, dimensionNumBytes));
     }
 
-    synchronized void setVectorDimensionsAndDistanceFunction(int number, String name, int numDimensions, VectorValues.DistanceFunction distFunc) {
+    synchronized void setVectorDimsAndDistFuncAndIndexType(int number, String name, int numDimensions,
+                                                           VectorValues.DistanceFunction distFunc,
+                                                           VectorValues.VectorIndexType type) {
       if (numDimensions < 0) {
         throw new IllegalArgumentException("vector numDimensions must be >= 0; got " + numDimensions);
       }
@@ -521,7 +527,7 @@ public class FieldInfos implements Iterable<FieldInfo> {
         throw new IllegalArgumentException("vector distFunc must be NONE when the vector numDimensions = 0; got " + distFunc);
       }
       verifyConsistentVectorProperties(number, name, numDimensions, distFunc);
-      vectorProps.put(name, new FieldVectorProperties(numDimensions, distFunc));
+      vectorProps.put(name, new FieldVectorProperties(numDimensions, distFunc, type));
     }
   }
   
@@ -556,7 +562,8 @@ public class FieldInfos implements Iterable<FieldInfo> {
         // before then we'll get the same name and number,
         // else we'll allocate a new one:
         final boolean isSoftDeletesField = name.equals(globalFieldNumbers.softDeletesFieldName);
-        final int fieldNumber = globalFieldNumbers.addOrGet(name, -1, IndexOptions.NONE, DocValuesType.NONE, 0, 0, 0, 0, VectorValues.DistanceFunction.NONE, isSoftDeletesField);
+        final int fieldNumber = globalFieldNumbers.addOrGet(name, -1, IndexOptions.NONE, DocValuesType.NONE, 0, 0, 0, 0,
+            VectorValues.DistanceFunction.NONE, VectorValues.VectorIndexType.NONE, isSoftDeletesField);
         fi = new FieldInfo(name, fieldNumber, false, false, false, IndexOptions.NONE,
             DocValuesType.NONE, -1, new HashMap<>(), 0, 0, 0, 0,
             VectorValues.DistanceFunction.NONE, VectorValues.VectorIndexType.NONE, isSoftDeletesField);
@@ -593,7 +600,8 @@ public class FieldInfos implements Iterable<FieldInfo> {
         // number for this field.  If the field was seen
         // before then we'll get the same name and number,
         // else we'll allocate a new one:
-        final int fieldNumber = globalFieldNumbers.addOrGet(name, preferredFieldNumber, indexOptions, docValues, dataDimensionCount, indexDimensionCount, dimensionNumBytes, vectorNumDimensions, vectorDistFunc, isSoftDeletesField);
+        final int fieldNumber = globalFieldNumbers.addOrGet(name, preferredFieldNumber, indexOptions, docValues, dataDimensionCount,
+            indexDimensionCount, dimensionNumBytes, vectorNumDimensions, vectorDistFunc, type, isSoftDeletesField);
         fi = new FieldInfo(name, fieldNumber, storeTermVector, omitNorms, storePayloads, indexOptions,
             docValues, dvGen, attributes, dataDimensionCount, indexDimensionCount, dimensionNumBytes,
             vectorNumDimensions, vectorDistFunc, type, isSoftDeletesField);

@@ -68,7 +68,7 @@ public final class FieldInfo {
    */
   public FieldInfo(String name, int number, boolean storeTermVector, boolean omitNorms, boolean storePayloads,
                    IndexOptions indexOptions, DocValuesType docValues, long dvGen, Map<String,String> attributes,
-                   int pointDataDimensionCount, int pointIndexDimensionCount, int pointNumBytes,
+                   int pointDimensionCount, int pointIndexDimensionCount, int pointNumBytes,
                    int vectorNumDimensions, VectorValues.DistanceFunction vectorDistFunc,
                    VectorValues.VectorIndexType vectorIndexType, boolean softDeletesField) {
     this.name = Objects.requireNonNull(name);
@@ -250,8 +250,9 @@ public final class FieldInfo {
     return pointNumBytes;
   }
 
-  /** Record that this field is indexed with vectors, with the specified num of dimensions and distance function */
-  public void setVectorDimensionsAndDistanceFunction(int numDimensions, VectorValues.DistanceFunction distFunc) {
+  /** Record that this field is indexed with vectors, with the specified num of dimensions, distance function and index type */
+  public void setVecDimsAndDistFuncAndIndexType(int numDimensions, VectorValues.DistanceFunction distFunc,
+                                                VectorValues.VectorIndexType indexType) {
     if (numDimensions < 0) {
       throw new IllegalArgumentException("vector numDimensions must be >= 0; got " + numDimensions);
     }
@@ -270,14 +271,9 @@ public final class FieldInfo {
 
     this.vectorNumDimensions = numDimensions;
     this.vectorDistFunc = distFunc;
+    this.vectorIndexType = indexType;
 
     assert checkConsistency();
-  }
-
-  public void setVecDimsAndDistFuncAndIndexType(int dims, VectorValues.DistanceFunction distFunc,
-                                                VectorValues.VectorIndexType indexType) {
-    this.vectorIndexType = indexType;
-    this.setVectorDimensionsAndDistanceFunction(dims, distFunc);
   }
 
   /** Returns the number of dimensions of the vector value */

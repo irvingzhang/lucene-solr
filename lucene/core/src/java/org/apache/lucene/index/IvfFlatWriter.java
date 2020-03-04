@@ -28,8 +28,8 @@ import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.Counter;
 import org.apache.lucene.util.IntsRef;
+import org.apache.lucene.util.ivfflat.Centroid;
 import org.apache.lucene.util.ivfflat.ImmutableClusterableVector;
-import org.apache.lucene.util.ivfflat.IvfFlatIndex;
 import org.apache.lucene.util.ivfflat.IvfFlatCacheWriter;
 
 public class IvfFlatWriter implements Accountable {
@@ -145,19 +145,19 @@ public class IvfFlatWriter implements Accountable {
               immutableClusterableVectors.add(new ImmutableClusterableVector(doc, rawVectors[idx++]));
             }
 
-            final List<IvfFlatIndex.ClusteredPoints> clusteredPoints = ivfFlatCacheWriter.cluster(immutableClusterableVectors);
+            final List<Centroid<ImmutableClusterableVector>> clusteredPoints = ivfFlatCacheWriter.cluster(immutableClusterableVectors);
 
             return new IvfFlatValues() {
               @Override
               public int[] getCentroids() {
-                return clusteredPoints.stream().mapToInt(IvfFlatIndex.ClusteredPoints::getCenter).toArray();
+                return clusteredPoints.stream().mapToInt(i -> i.getCenter().docId()).toArray();
               }
 
               @Override
               public IntsRef getIvfLink(int centroid) {
-                for (IvfFlatIndex.ClusteredPoints clusteredPoint : clusteredPoints) {
-                  if (clusteredPoint.getCenter() == centroid) {
-                    int[] ivfLink = clusteredPoint.getPoints().stream().mapToInt(i -> i).toArray();
+                for (Centroid<ImmutableClusterableVector> clusteredPoint : clusteredPoints) {
+                  if (clusteredPoint.getCenter().docId() == centroid) {
+                    int[] ivfLink = clusteredPoint.getPoints().stream().mapToInt(ImmutableClusterableVector::docId).toArray();
                     return new IntsRef(ivfLink, 0, ivfLink.length);
                   }
                 }
@@ -191,7 +191,7 @@ public class IvfFlatWriter implements Accountable {
     }
 
     @Override
-    public float[] vectorValue() throws IOException {
+    public float[] vectorValue() {
       return value;
     }
 
