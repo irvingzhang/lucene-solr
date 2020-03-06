@@ -87,12 +87,23 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
    */
   @Override
   public void writeField(FieldInfo fieldInfo, IvfFlatIndexReader reader) throws IOException {
-    long vectorDataOffset = vectorData.getFilePointer();
+    final IvfFlatValues ivfFlatValues = reader.getIvfFlatValues(fieldInfo.name);
+    final VectorValues centroidValues = ivfFlatValues.getCentroids();
 
+    long centroidDataOffset = vectorData.getFilePointer();
+    writeCentroids(centroidValues, fieldInfo.getVectorNumDimensions());
+
+    long vectorDataOffset = vectorData.getFilePointer();
     final Map<Integer, Integer> vecToDocOffset = writeVectors(fieldInfo, reader);
 
-    writeMeta(fieldInfo, vectorDataOffset, vectorData.getFilePointer() - vectorDataOffset,
-        fieldInfo, reader, vecToDocOffset);
+    writeMeta(fieldInfo, centroidDataOffset, vectorDataOffset - centroidDataOffset, vectorDataOffset,
+        vectorData.getFilePointer() - vectorDataOffset, ivfFlatValues, vecToDocOffset);
+  }
+
+  protected void writeCentroids(VectorValues centroidValues, int numDims) throws IOException {
+    for (int doc = centroidValues.nextDoc(); doc != NO_MORE_DOCS; doc = centroidValues.nextDoc()) {
+      writeVectorValue(numDims, centroidValues);
+    }
   }
 
   protected Map<Integer, Integer> writeVectors(final FieldInfo fieldInfo, final IvfFlatIndexReader reader) throws IOException {
@@ -117,20 +128,20 @@ public class Lucene90IvfFlatIndexWriter extends IvfFlatIndexWriter {
     vectorData.writeBytes(binaryValue.bytes, binaryValue.offset, binaryValue.length);
   }
 
-  private void writeMeta(FieldInfo field, long vectorDataOffset, long vectorDataLength, final FieldInfo fieldInfo,
-                         final IvfFlatIndexReader reader, final Map<Integer, Integer> vecToDocOffset) throws IOException {
+  private void writeMeta(FieldInfo field, long centroidOffset, long centroidDataLength, long vectorDataOffset,
+                         long vectorDataLength, final IvfFlatValues ivfFlatValues,
+                         final Map<Integer, Integer> vecToDocOffset) throws IOException {
     ivfFlatMeta.writeInt(field.number);
+    ivfFlatMeta.writeVLong(centroidOffset);
+    ivfFlatMeta.writeVLong(centroidDataLength);
     ivfFlatMeta.writeVLong(vectorDataOffset);
     ivfFlatMeta.writeVLong(vectorDataLength);
 
-    final IvfFlatValues ivfFlatValues = reader.getIvfFlatValues(fieldInfo.name);
+    int numCentroids = ivfFlatValues.getClusterSize();
+    ivfFlatMeta.writeInt(numCentroids);
 
-    int[] centroids = ivfFlatValues.getCentroids();
-    ivfFlatMeta.writeInt(centroids.length);
-
-    for (int centroid : centroids) {
-      ivfFlatMeta.writeVInt(centroid);
-      final IntsRef ivfFlatLink = ivfFlatValues.getIvfLink(centroid);
+    for (int i = 0; i < numCentroids; ++i) {
+      final IntsRef ivfFlatLink = ivfFlatValues.getIvfLink(i);
       ivfFlatMeta.writeInt(ivfFlatLink.length);
       if (ivfFlatLink.length > 0) {
         int stop = ivfFlatLink.offset + ivfFlatLink.length;

@@ -21,15 +21,20 @@ package org.apache.lucene.util.ivfflat;
  * {@code Centroid} is a model for center point in k-means clustering.
  */
 public class Centroid<T extends Clusterable> extends Cluster<T> {
-  private final Clusterable center;
+  private Clusterable center;
 
   /** Sole constructor */
   public Centroid(Clusterable center) {
     this.center = center;
   }
 
-  /** Returns the centroid point */
+  /** Returns the center point */
   public Clusterable getCenter() {
     return this.center;
+  }
+
+  /** Reset center point */
+  public void setCenter(Clusterable center) {
+    this.center = center;
   }
 }

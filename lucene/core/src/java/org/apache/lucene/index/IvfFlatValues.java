@@ -30,10 +30,16 @@ public abstract class IvfFlatValues {
   protected IvfFlatValues() {}
 
   /**
+   * Return the size of clusters.
+   * @return cluster size
+   */
+  public abstract int getClusterSize();
+
+  /**
    * Returns the center points of the ivfflat index.
    * @return centroids
    */
-  public abstract int[] getCentroids();
+  public abstract VectorValues getCentroids();
 
   /**
    * Returns the inverse list (doc ID list) that belongs to the {@code centroid}.
@@ -46,13 +52,23 @@ public abstract class IvfFlatValues {
   /** Empty graph value */
   public static final IvfFlatValues EMPTY = new IvfFlatValues() {
     /**
+     * Return the size of clusters.
+     *
+     * @return cluster size
+     */
+    @Override
+    public int getClusterSize() {
+      return 0;
+    }
+
+    /**
      * Returns the center points of the ivfflat index.
      *
      * @return centroids
      */
     @Override
-    public int[] getCentroids() {
-      return IntsRef.EMPTY_INTS;
+    public VectorValues getCentroids() {
+      return VectorValues.EMPTY;
     }
 
     /**

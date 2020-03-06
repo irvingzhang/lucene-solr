@@ -32,21 +32,21 @@ import org.apache.lucene.store.DataOutput;
  * Lucene 9.0 IVFFlat index format.
  * <p>The centroid and the associated points (clustered by K-Means clustering) are write into the file with suffix <tt>.ifi</tt> and <tt>.ifd</tt>.</p>
  * <p>
- *   For best performance, all cluster information is store in the IVFFlat index file with suffix <tt>.ifi</tt>, and is kept on heap:
+ * For best performance, all cluster information is store in the IVFFlat index file with suffix <tt>.ifi</tt>, and is kept on heap:
  * </p>
  * <p>
- *   IVFFlat file (.ifi) --&gt; Header,FieldNumber,VectorDataOffset,VectorDataLength,CentroidSize, &lt;Centroid,
- *   IVFListSize,FirstDocID,FirstDocOrder, &lt;DocIDDelta,DocOrder&gt; <sup>IVFListSize-1</sup>&gt;<sup>CentroidSize</sup>,Footer
+ * IVFFlat file (.ifi) --&gt; Header,FieldNumber,VectorDataOffset,VectorDataLength,CentroidSize, &lt;Centroid,
+ * IVFListSize,FirstDocID,FirstDocOrder, &lt;DocIDDelta,DocOrder&gt; <sup>IVFListSize-1</sup>&gt;<sup>CentroidSize</sup>,Footer
  * </p>
  * <p>
- *   For saving memory, each cluster information is store in the IVFFlat data file with suffix <tt>.ifd</tt>, and will be read on demand:
+ * For saving memory, each cluster information is store in the IVFFlat data file with suffix <tt>.ifd</tt>, and will be read on demand:
  * </p>
  * <p>
- *   IVFFlat file (.ifi) --&gt; Header,FieldNumber,VectorDataOffset,VectorDataLength,IvfDataOffset,IvfDataLength,CentroidSize,&lt;Centroid,
- *   DocOrder,IVFIndexDataOffsete&gt;<sup>CentroidSize</sup>,LeftDocSize,&lt;DocID&gt;<sup>LeftDocSize</sup>,Footer
+ * IVFFlat file (.ifi) --&gt; Header,FieldNumber,VectorDataOffset,VectorDataLength,IvfDataOffset,IvfDataLength,CentroidSize,&lt;Centroid,
+ * DocOrder,IVFIndexDataOffsete&gt;<sup>CentroidSize</sup>,LeftDocSize,&lt;DocID&gt;<sup>LeftDocSize</sup>,Footer
  * </p>
  * <p>
- *   IVFFlat file (.ifd) --&gt; Header,IVFListSize,&lt;DocIDDelta&gt; <sup>IVFListSize</sup>,Footer
+ * IVFFlat file (.ifd) --&gt; Header,IVFListSize,&lt;DocIDDelta&gt; <sup>IVFListSize</sup>,Footer
  * </p>
  * <p>Field types:</p>
  * <ul>
@@ -84,6 +84,7 @@ public class Lucene90IvfFlatIndexFormat extends IvfFlatIndexFormat {
   static final int VERSION_CURRENT = VERSION_START;
 
   private final Mode mode;
+
   /**
    * Returns a {@link IvfFlatIndexWriter} to write the vectors and ivfflat to the index.
    */

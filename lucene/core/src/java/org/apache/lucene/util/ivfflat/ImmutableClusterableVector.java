@@ -20,7 +20,7 @@ package org.apache.lucene.util.ivfflat;
 import java.util.Arrays;
 
 public class ImmutableClusterableVector implements Comparable<ImmutableClusterableVector>, Clusterable {
-  private final int docId;
+  private int docId;
 
   private final float[] vectorValues;
 
@@ -35,6 +35,18 @@ public class ImmutableClusterableVector implements Comparable<ImmutableClusterab
   @Override
   public int docId() {
     return this.docId;
+  }
+
+  /**
+   * Set docId to current clusterable object.
+   *
+   * @param docId
+   * @return
+   */
+  @Override
+  public Clusterable setDocId(int docId) {
+    this.docId = docId;
+    return this;
   }
 
   /**
@@ -84,6 +96,14 @@ public class ImmutableClusterableVector implements Comparable<ImmutableClusterab
   @Override
   public float[] getPoint() {
     return this.vectorValues;
+  }
+
+  /**
+   * Clone myself.
+   */
+  @Override
+  public Clusterable clone() {
+    return new ImmutableClusterableVector(this.docId, this.vectorValues);
   }
 
   @Override

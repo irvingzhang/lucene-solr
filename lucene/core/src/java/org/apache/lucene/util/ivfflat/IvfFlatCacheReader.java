@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.lucene.index.FieldInfo;
-import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IvfFlatValues;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.VectorValues;
@@ -41,16 +40,8 @@ public final class IvfFlatCacheReader {
 
   public SortedImmutableVectorValue search(float[] query, int ef, int numCentroids,
                                            VectorValues vectorValues) throws IOException {
-    return load(field, context).search(query, ef, numCentroids, vectorValues);
-  }
-
-  public static long loadIvfFlats(String field, IndexReader reader) throws IOException {
-    long bytesUsed = 0L;
-    for (LeafReaderContext ctx : reader.leaves()) {
-      final IvfFlatIndex ivFFlatIndex = load(field, ctx);
-      bytesUsed += ivFFlatIndex.ramBytesUsed();
-    }
-    return bytesUsed;
+    return load(field, context).search(query, ef, numCentroids, vectorValues,
+        context.reader().getIvfFlatValues(field));
   }
 
   private static IvfFlatIndex load(String field, LeafReaderContext context) throws IOException {
@@ -64,11 +55,11 @@ public final class IvfFlatCacheReader {
   }
 
   public static IvfFlatIndex load(VectorValues.DistanceFunction distFunc, final IvfFlatValues ivfFlatValues) throws IOException {
-    final int[] centroids = ivfFlatValues.getCentroids();
-    final List<IvfFlatIndex.ClusteredPoints> clusteredPointsList = new ArrayList<>(centroids.length);
-    for (int centroid : centroids) {
-      final IntsRef ivfLink = ivfFlatValues.getIvfLink(centroid);
-      IvfFlatIndex.ClusteredPoints clusteredPoints = new IvfFlatIndex.ClusteredPoints(centroid,
+    int clusterSize = ivfFlatValues.getClusterSize();
+    final List<IvfFlatIndex.ClusteredPoints> clusteredPointsList = new ArrayList<>(clusterSize);
+    for (int i = 0; i < clusterSize; ++i) {
+      final IntsRef ivfLink = ivfFlatValues.getIvfLink(i);
+      IvfFlatIndex.ClusteredPoints clusteredPoints = new IvfFlatIndex.ClusteredPoints(i,
           Arrays.stream(ivfLink.ints).boxed().collect(Collectors.toList()));
 
       clusteredPointsList.add(clusteredPoints);

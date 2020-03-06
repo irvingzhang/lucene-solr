@@ -20,6 +20,7 @@ package org.apache.lucene.codecs.lucene90;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.index.CorruptIndexException;
@@ -28,6 +29,7 @@ import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.IvfFlatValues;
 import org.apache.lucene.index.SegmentReadState;
+import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.store.ChecksumIndexInput;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.IOUtils;
@@ -73,13 +75,27 @@ public class Lucene90IvfFlatIndexReaderV2 extends Lucene90IvfFlatIndexReader {
    * @param field the field name for retrieval
    */
   @Override
-  public IvfFlatValues getIvfFlatValues(String field) {
+  public IvfFlatValues getIvfFlatValues(String field) throws IOException {
+    final FieldInfo info = fieldInfos.fieldInfo(field);
+    if (info == null) {
+      return IvfFlatValues.EMPTY;
+    }
+
     final IvfFlatEntryV2 ivfFlatEntry = (IvfFlatEntryV2) ivfFlats.get(field);
     if (ivfFlatEntry == null) {
       return IvfFlatValues.EMPTY;
     }
 
-    return new IndexedIvfFlatReaderV2(maxDoc, ivfFlatEntry, ivfFlatData);
+    final Map<Integer, Integer> docToVectorOrd = new HashMap<>(ivfFlatEntry.numCentroids);
+    IntStream.range(0, ivfFlatEntry.numCentroids).forEach(i -> docToVectorOrd.put(i, i));
+    VectorDataEntry vectorDataEntry = new VectorDataEntry(ivfFlatEntry.centroidDataOffset,
+        ivfFlatEntry.centroidDataLength, docToVectorOrd);
+
+    final IndexInput bytesSlice = vectorData.slice("vector-centroid-data",
+        ivfFlatEntry.centroidDataOffset, ivfFlatEntry.centroidDataLength);
+
+    return new IndexedIvfFlatReaderV2(maxDoc, new RandomAccessVectorValuesReader(maxDoc, info.getVectorNumDimensions(),
+        vectorDataEntry, bytesSlice), ivfFlatEntry, ivfFlatData);
   }
 
   /**
@@ -108,6 +124,8 @@ public class Lucene90IvfFlatIndexReaderV2 extends Lucene90IvfFlatIndexReader {
         throw new CorruptIndexException("Invalid field number: " + fieldNumber, meta);
       }
 
+      long centroidDataOffset = meta.readVLong();
+      long centroidDataLength = meta.readVLong();
       long vectorDataOffset = meta.readVLong();
       long vectorDataLength = meta.readVLong();
       long ivfDataOffset = meta.readVLong();
@@ -118,7 +136,6 @@ public class Lucene90IvfFlatIndexReaderV2 extends Lucene90IvfFlatIndexReader {
       final Map<Integer, Integer> docToOrd = new HashMap<>();
       for (int i = 0; i < clustersSize; ++i) {
         int centroid = meta.readVInt();
-        docToOrd.put(centroid, meta.readVInt());
         clusters.put(centroid, meta.readVLong());
       }
 
@@ -128,7 +145,7 @@ public class Lucene90IvfFlatIndexReaderV2 extends Lucene90IvfFlatIndexReader {
       }
 
       IvfFlatEntryV2 ivfFlatEntry = new IvfFlatEntryV2(vectorDataOffset, vectorDataLength,
-          ivfDataOffset, ivfDataLength, docToOrd, clusters);
+          ivfDataOffset, ivfDataLength, centroidDataOffset, centroidDataLength, clustersSize, docToOrd, clusters);
 
       ramBytesUsed += RamUsageEstimator.shallowSizeOfInstance(IvfFlatEntryV2.class);
       ramBytesUsed += RamUsageEstimator.shallowSizeOf(ivfFlatEntry.docToVectorOrd);
@@ -138,17 +155,22 @@ public class Lucene90IvfFlatIndexReaderV2 extends Lucene90IvfFlatIndexReader {
   }
 
   private static final class IvfFlatEntryV2 extends VectorDataEntry {
-    final int[] centroids;
+    final int numCentroids;
+    final long centroidDataOffset;
+    final long centroidDataLength;
     final long ivfDataOffset;
     final long ivfDataLenght;
     final Map<Integer, Long> docToCentroidOffset;
 
     public IvfFlatEntryV2(long vectorDataOffset, long vectorDataLength, long ivfDataOffset, long ivfDataLenght,
+                          long centroidDataOffset, long centroidDataLength, int numCentroids,
                           final Map<Integer, Integer> docToVectorOrd, final Map<Integer, Long> docToCentroidOffset) {
       super(vectorDataOffset, vectorDataLength, docToVectorOrd);
       this.ivfDataOffset = ivfDataOffset;
       this.ivfDataLenght = ivfDataLenght;
-      this.centroids = docToCentroidOffset.keySet().stream().mapToInt(i -> i).toArray();
+      this.centroidDataLength = centroidDataLength;
+      this.centroidDataOffset = centroidDataOffset;
+      this.numCentroids = numCentroids;
       this.docToCentroidOffset = docToCentroidOffset;
     }
   }
@@ -159,12 +181,26 @@ public class Lucene90IvfFlatIndexReaderV2 extends Lucene90IvfFlatIndexReader {
 
     final IndexInput ivfFlatData;
 
+    final VectorValues vectorData;
+
     final IvfFlatEntryV2 ivfFlatEntry;
 
-    private IndexedIvfFlatReaderV2(long maxDoc, final IvfFlatEntryV2 ivfFlatEntry, final IndexInput ivfFlatData) {
+    private IndexedIvfFlatReaderV2(long maxDoc, final VectorValues vectorData, final IvfFlatEntryV2 ivfFlatEntry,
+                                   final IndexInput ivfFlatData) {
       this.maxDoc = maxDoc;
       this.ivfFlatData = ivfFlatData;
       this.ivfFlatEntry = ivfFlatEntry;
+      this.vectorData = vectorData;
+    }
+
+    /**
+     * Return the size of clusters.
+     *
+     * @return cluster size
+     */
+    @Override
+    public int getClusterSize() {
+      return ivfFlatEntry.numCentroids;
     }
 
     /**
@@ -173,8 +209,8 @@ public class Lucene90IvfFlatIndexReaderV2 extends Lucene90IvfFlatIndexReader {
      * @return the center points of all clusters
      */
     @Override
-    public int[] getCentroids() {
-      return ivfFlatEntry.centroids;
+    public VectorValues getCentroids() {
+      return vectorData;
     }
 
     /**

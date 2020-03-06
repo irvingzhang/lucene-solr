@@ -66,12 +66,9 @@ public class KnnIvfPerformTester extends LuceneTestCase {
       final List<int[]> groundTruthVects = SiftDataReader.ivecReadAll(args[2], queryDataset.size());
       assertNotNull(groundTruthVects);
 
-      boolean success = false;
-      for (int i = 0; !success && i < 10; ++i) { /// max retry 10 times
-        success = runCase(siftDataset.size(), siftDataset.get(0).length,
-            siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects,
-            new int[]{5, 10, 20, 50, 100});
-      }
+      runCase(siftDataset.size(), siftDataset.get(0).length, siftDataset,
+          VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects,
+          new int[]{8, 16, 32, 64, 128, 256});
     } catch (IOException e) {
       e.printStackTrace();
       System.exit(1);
@@ -99,9 +96,9 @@ public class KnnIvfPerformTester extends LuceneTestCase {
       iw.forceMerge(1);
       long forceEndTime = System.currentTimeMillis();
 
-      System.out.println("[***" + type + "***] [ADD] cost " + (addEndTime - addStartTime) + " msec, [COMMIT] cost "
-          + (commitEndTime - addEndTime) + " msec, [ForceMerge(1)] cost " + (forceEndTime - commitEndTime) + " msec, total cost "
-          + (forceEndTime - commitEndTime) + " msec");
+      System.out.println("[***" + type + "***] total base set size " + randomVectors.size() + ", [ADD] cost " + (addEndTime - addStartTime)
+          + " msec, [COMMIT] cost " + (commitEndTime - addEndTime) + " msec, [ForceMerge(1)] cost " + (forceEndTime - commitEndTime)
+          + " msec, total cost " + (forceEndTime - commitEndTime) + " msec");
 
       TestKnnIvfFlat.KnnTestHelper.assertConsistent(iw, randomVectors, type);
 

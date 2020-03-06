@@ -46,7 +46,7 @@ public class TestKmeansCluster extends LuceneTestCase {
     final KMeansCluster<ImmutableClusterableVector> cluster = new KMeansCluster<>(VectorValues.DistanceFunction.EUCLIDEAN);
 
     long startTime = System.currentTimeMillis();
-    final List<Centroid<ImmutableClusterableVector>> centroids = cluster.cluster(clusterableVectors);
+    final List<Centroid<ImmutableClusterableVector>> centroids = cluster.cluster(clusterableVectors, 200);
     long costTime = System.currentTimeMillis() - startTime;
 
     /*System.out.println("Total points -> " + clusterableVectors.size() + ", dimension -> " + dims + ", clustering cost -> " +

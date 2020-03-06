@@ -20,10 +20,16 @@ package org.apache.lucene.util.ivfflat;
 /**
  * Any class that needs K-means clustering should inherit {@code Clusterable} interface.
  */
-public interface Clusterable {
+public interface Clusterable extends Cloneable {
   /** Returns the doc id. */
   int docId();
 
+  /** Set docId to current clusterable object. */
+  Clusterable setDocId(int docId);
+
   /** Get point value. */
   float[] getPoint();
+
+  /** Clone myself. */
+  Clusterable clone();
 }

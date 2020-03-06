@@ -18,28 +18,19 @@
 package org.apache.lucene.codecs.lucene90;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.lucene.codecs.CodecUtil;
 import org.apache.lucene.codecs.IvfFlatIndexReader;
-import org.apache.lucene.codecs.IvfFlatIndexWriter;
 import org.apache.lucene.index.FieldInfo;
 import org.apache.lucene.index.IndexFileNames;
 import org.apache.lucene.index.IvfFlatValues;
-import org.apache.lucene.index.IvfFlatWriter;
-import org.apache.lucene.index.MergeState;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.store.IndexOutput;
-import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.Counter;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.IntsRef;
-
-import static org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
 
 /**
  * Writes vector values and ivfflat index to index segments.
@@ -74,21 +65,31 @@ public class Lucene90IvfFlatIndexWriterV2 extends Lucene90IvfFlatIndexWriter {
    */
   @Override
   public void writeField(FieldInfo fieldInfo, IvfFlatIndexReader reader) throws IOException {
+    final IvfFlatValues ivfFlatValues = reader.getIvfFlatValues(fieldInfo.name);
+    final VectorValues centroidValues = ivfFlatValues.getCentroids();
+
+    long centroidDataOffset = vectorData.getFilePointer();
+    writeCentroids(centroidValues, fieldInfo.getVectorNumDimensions());
+
     long vectorDataOffset = vectorData.getFilePointer();
 
     final Map<Integer, Integer> vecToDocOffset = writeVectors(fieldInfo, reader);
 
     long ivfDataOffset = ivfFlatData.getFilePointer();
 
-    final Map<Integer, Long> ivfOffsets = writeData(fieldInfo, reader);
+    final Map<Integer, Long> ivfOffsets = writeData(ivfFlatValues);
 
-    writeMeta(fieldInfo, vectorDataOffset, vectorData.getFilePointer() - vectorDataOffset,
-        ivfDataOffset, ivfFlatData.getFilePointer() - ivfDataOffset, ivfOffsets, vecToDocOffset);
+    writeMeta(fieldInfo, centroidDataOffset, vectorDataOffset - centroidDataOffset, vectorDataOffset,
+        vectorData.getFilePointer() - vectorDataOffset, ivfDataOffset, ivfFlatData.getFilePointer() - ivfDataOffset,
+        ivfOffsets, vecToDocOffset);
   }
 
-  private void writeMeta(final FieldInfo field, long vectorDataOffset, long vectorDataLength, long ivfDataOffset,
-                         long ivfDataLenght, final Map<Integer, Long> ivfOffsets, final Map<Integer, Integer> vecToDocOffset) throws IOException {
+  private void writeMeta(final FieldInfo field, long centroidOffset, long centroidLength, long vectorDataOffset,
+                         long vectorDataLength, long ivfDataOffset, long ivfDataLenght, final Map<Integer, Long> ivfOffsets,
+                         final Map<Integer, Integer> vecToDocOffset) throws IOException {
     ivfFlatMeta.writeInt(field.number);
+    ivfFlatMeta.writeVLong(centroidOffset);
+    ivfFlatMeta.writeVLong(centroidLength);
     ivfFlatMeta.writeVLong(vectorDataOffset);
     ivfFlatMeta.writeVLong(vectorDataLength);
     ivfFlatMeta.writeVLong(ivfDataOffset);
@@ -98,30 +99,23 @@ public class Lucene90IvfFlatIndexWriterV2 extends Lucene90IvfFlatIndexWriter {
 
     for (Map.Entry<Integer, Long> cluster : ivfOffsets.entrySet()) {
       ivfFlatMeta.writeVInt(cluster.getKey());
-
-      assert vecToDocOffset.containsKey(cluster.getKey());
-      ivfFlatMeta.writeVInt(vecToDocOffset.get(cluster.getKey()));
-
       ivfFlatMeta.writeVLong(cluster.getValue());
     }
 
-    ivfFlatMeta.writeInt(vecToDocOffset.size() - ivfOffsets.size());
-    vecToDocOffset.entrySet().removeIf(i -> ivfOffsets.containsKey(i.getKey()));
+    ivfFlatMeta.writeInt(vecToDocOffset.size() );
     for (Map.Entry<Integer, Integer> offset : vecToDocOffset.entrySet()) {
       ivfFlatMeta.writeVInt(offset.getKey());
       ivfFlatMeta.writeVInt(offset.getValue());
     }
   }
 
-  private Map<Integer, Long> writeData(final FieldInfo fieldInfo, final IvfFlatIndexReader reader) throws IOException {
-    final IvfFlatValues ivfFlatValues = reader.getIvfFlatValues(fieldInfo.name);
-    int[] centroids = ivfFlatValues.getCentroids();
+  private Map<Integer, Long> writeData(final IvfFlatValues ivfFlatValues) throws IOException {
+    int numCentroids = ivfFlatValues.getClusterSize();
+    final Map<Integer, Long> ivfOffsets = new HashMap<>(numCentroids);
+    for (int i = 0; i < numCentroids; ++i) {
+      ivfOffsets.put(i, ivfFlatData.getFilePointer());
 
-    final Map<Integer, Long> ivfOffsets = new HashMap<>();
-    for (int centroid : centroids) {
-      ivfOffsets.put(centroid, ivfFlatData.getFilePointer());
-
-      writeIvfData(ivfFlatValues.getIvfLink(centroid));
+      writeIvfData(ivfFlatValues.getIvfLink(i));
     }
 
     return ivfOffsets;

@@ -18,19 +18,18 @@
 package org.apache.lucene.util.ivfflat;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.Random;
 
 import org.apache.lucene.index.VectorValues;
 
 /**
- * Migrate from {@link org.apache.commons.math3.ml.clustering.KMeansPlusPlusClusterer}
- * with refactoring, avoiding to introduce external dependencies.
+ * KMeans clustering
  *
  * TODO Consider training faster
  */
@@ -44,8 +43,6 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   private int maxIterations;
 
   private int k;
-
-  private final Random random;
 
   private final DistanceMeasure distanceMeasure;
 
@@ -61,7 +58,6 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
     this.maxIterations = maxIterations;
     this.k = k;
     this.distanceMeasure = DistanceFactory.instance(distFunc);
-    this.random = new Random();
   }
 
   /** Cluster points on the basis of a similarity measure
@@ -83,14 +79,12 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
       this.k = 1048576;
     }*/
 
-    this.k = Math.min(collectionSize, (int) Math.sqrt(collectionSize) << 1);
+    int numCentroids = Math.min(collectionSize, (int) Math.sqrt(collectionSize) << 2);
     /// 12.5% or k * 32 points for training
-    int trainingSize = Math.min(collectionSize, Math.max(collectionSize >> 3, this.k << 5));
+    int trainingSize = Math.min(collectionSize, Math.max(collectionSize >> 3, numCentroids << 5));
 
-    if (trainingSize < collectionSize) {
-      /// shuffle the whole collection
-      Collections.shuffle(trainingPoints);
-    }
+    /// shuffle the whole collection
+    Collections.shuffle(trainingPoints);
 
     /// select a subset for training
     final List<T> trainingSubset = trainingPoints.subList(0, trainingSize);
@@ -98,26 +92,10 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
     final List<T> untrainedSubset = trainingPoints.subList(trainingSize, collectionSize);
 
     /// training
-    final List<Centroid<T>> centroidList = cluster(trainingSubset, this.k);
+    final List<Centroid<T>> centroidList = cluster(trainingSubset, numCentroids);
 
     /// insert each untrained point to the nearest cluster
-    untrainedSubset.forEach(point -> {
-      final Optional<Centroid<T>> nearestCentroid = centroidList.stream().min((o1, o2) -> {
-        float lhs = this.distanceMeasure.compute(o1.getCenter().getPoint(), point.getPoint());
-        float rhs = this.distanceMeasure.compute(o2.getCenter().getPoint(), point.getPoint());
-
-        if (lhs < rhs) {
-          return -1;
-        } else if (rhs < lhs) {
-          return 1;
-        }
-
-        return 0;
-      });
-
-      assert nearestCentroid.isPresent();
-      nearestCentroid.get().addPoint(point);
-    });
+    this.assignPoints(untrainedSubset, centroidList);
 
     return centroidList;
   }
@@ -133,187 +111,98 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   @Override
   public List<Centroid<T>> cluster(Collection<T> trainingPoints, int numCentroids) throws NoSuchElementException {
     assert numCentroids <= trainingPoints.size();
-
-    List<Centroid<T>> clusters = this.initCenters(trainingPoints);
-    int[] assignments = new int[trainingPoints.size()];
-    this.assignPointsToClusters(clusters, trainingPoints, assignments);
+    this.k = numCentroids;
+    final List<Centroid<T>> clusters = this.initCentroids(trainingPoints);
     int max = this.maxIterations < 0 ? MAX_KMEANS_ITERATIONS : this.maxIterations;
 
+    boolean isCenterChanged = true;
     for (int count = 0; count < max; ++count) {
-      boolean emptyCluster = false;
-      final List<Centroid<T>> newClusters = new ArrayList<>();
-
-      Clusterable newCenter;
-      for (Iterator<Centroid<T>> i$ = clusters.iterator(); i$.hasNext();
-           newClusters.add(new Centroid<>(newCenter))) {
-        final Centroid<T> cluster = i$.next();
-        if (cluster.getPoints().isEmpty()) {
-          newCenter = this.getFarthestPoint(clusters);
-          emptyCluster = true;
-        } else {
-          newCenter = this.centroidOf(cluster.getCenter().docId(), cluster.getPoints(),
-              cluster.getCenter().getPoint().length);
-        }
+      isCenterChanged = this.clustering(trainingPoints, clusters);
+      if (isCenterChanged) {
+        clusters.forEach(c -> c.getPoints().clear());
+      } else {
+        break;
       }
+    }
 
-      int changes = this.assignPointsToClusters(newClusters, trainingPoints, assignments);
-      clusters = newClusters;
-      if (changes == 0 && !emptyCluster) {
-        return newClusters;
-      }
+    if (isCenterChanged) {
+      this.assignPoints(trainingPoints, clusters);
     }
 
     return clusters;
   }
 
-  private List<Centroid<T>> initCenters(final Collection<T> points) {
-    final List<T> pointList = List.copyOf(points);
-    int numPoints = pointList.size();
-    boolean[] visited = new boolean[numPoints];
-    final List<Centroid<T>> resultSet = new ArrayList<>(this.k);
+  private void assignPoints(final Collection<T> points, final List<Centroid<T>> clusters) {
+    for (final T point : points) {
+      final Optional<Centroid<T>> nearestCentroid = clusters.stream().min((o1, o2) -> {
+        float lhs = distance(o1.getCenter(), point);
+        float rhs = distance(o2.getCenter(), point);
 
-    /// random select the first point
-    int firstPointIndex = this.random.nextInt(numPoints);
-    T firstPoint = pointList.get(firstPointIndex);
-    resultSet.add(new Centroid<>(firstPoint));
-    visited[firstPointIndex] = true;
-    float[] minDistSquared = new float[numPoints];
-
-    /// calculate min distance squares between the first point and any other point
-    for (int i = 0; i < numPoints; ++i) {
-      if (i != firstPointIndex) {
-        float d = this.distance(firstPoint, pointList.get(i));
-        minDistSquared[i] = d * d;
-      }
-    }
-
-    while (resultSet.size() < this.k) {
-      float distSqSum = 0.0F;
-
-      for (int i = 0; i < numPoints; ++i) {
-        if (!visited[i]) {
-          distSqSum += minDistSquared[i];
+        if (lhs < rhs) {
+          return -1;
+        } else if (rhs < lhs) {
+          return 1;
         }
-      }
 
-      float r = this.random.nextFloat() * distSqSum;
-      int nextPointIndex = -1;
-      float sum = 0.0F;
+        return 0;
+      });
 
-      int i = 0;
-      for (;i < numPoints; ++i) {
-        if (!visited[i]) {
-          sum += minDistSquared[i];
-          if (sum >= r) {
-            nextPointIndex = i;
-            break;
-          }
-        }
-      }
-
-      if (nextPointIndex == -1) {
-        for (i = numPoints - 1; i >= 0; --i) {
-          if (!visited[i]) {
-            nextPointIndex = i;
-            break;
-          }
-        }
-      }
-
-      if (nextPointIndex < 0) {
-        break;
-      }
-
-      T p = pointList.get(nextPointIndex);
-      resultSet.add(new Centroid<>(p));
-      visited[nextPointIndex] = true;
-      if (resultSet.size() < this.k) {
-        for (int j = 0; j < numPoints; ++j) {
-          if (!visited[j]) {
-            float d = this.distance(p, pointList.get(j));
-            float d2 = d * d;
-            if (d2 < minDistSquared[j]) {
-              minDistSquared[j] = d2;
-            }
-          }
-        }
-      }
-    }
-
-    return resultSet;
-  }
-
-  private int assignPointsToClusters(final List<Centroid<T>> clusters, final Collection<T> points, int[] assignments) {
-    int assignedDifferently = 0, pointIndex = 0;
-
-    int clusterIndex;
-    for (Iterator<T> i$ = points.iterator(); i$.hasNext(); assignments[pointIndex++] = clusterIndex) {
-      T p = i$.next();
-      clusterIndex = this.getNearestCluster(clusters, p);
-      if (clusterIndex != assignments[pointIndex]) {
-        ++assignedDifferently;
-      }
-
-      clusters.get(clusterIndex).addPoint(p);
-    }
-
-    return assignedDifferently;
-  }
-
-  private int getNearestCluster(final Collection<Centroid<T>> clusters, T point) {
-    float minDistance = Float.MAX_VALUE;
-    int clusterIndex = 0, minCluster = 0;
-
-    for (Iterator<Centroid<T>> i$ = clusters.iterator(); i$.hasNext(); ++clusterIndex) {
-      float distance = this.distance(point, i$.next().getCenter());
-      if (distance < minDistance) {
-        minDistance = distance;
-        minCluster = clusterIndex;
-      }
-    }
-
-    return minCluster;
-  }
-
-  private T getFarthestPoint(final Collection<Centroid<T>> clusters) throws NoSuchElementException {
-    float maxDistance = Float.MIN_NORMAL;
-    Cluster<T> selectedCluster = null;
-    int selectedPoint = -1;
-
-    for (Centroid<T> cluster : clusters) {
-      final Clusterable center = cluster.getCenter();
-      final List<T> points = cluster.getPoints();
-
-      for (int i = 0; i < points.size(); ++i) {
-        float distance = this.distance(points.get(i), center);
-        if (distance > maxDistance) {
-          maxDistance = distance;
-          selectedCluster = cluster;
-          selectedPoint = i;
-        }
-      }
-    }
-
-    if (selectedCluster == null) {
-      throw new NoSuchElementException("Cannot find point from farthest cluster");
-    } else {
-      return selectedCluster.getPoints().remove(selectedPoint);
+      assert nearestCentroid.isPresent();
+      nearestCentroid.get().addPoint(point);
     }
   }
 
-  private Clusterable centroidOf(int docId, final Collection<T> points, int dimension) {
-    float[] centroid = new float[dimension];
+  private List<Centroid<T>> initCentroids(final Collection<T> points) {
+    final List<Centroid<T>> centroids = new ArrayList<>(this.k);
+    int docId = 0;
+    for (Iterator<T> i$ = points.iterator(); i$.hasNext() && centroids.size() < this.k;) {
+      centroids.add(new Centroid<>(i$.next().clone().setDocId(docId++)));
+    }
 
-    for (T p : points) {
-      float[] point = p.getPoint();
+    assert centroids.size() == this.k;
 
+    return centroids;
+  }
+
+  private boolean clustering(final Collection<T> points, final List<Centroid<T>> centroids) {
+    for (T point : points) {
+      int bestCentroid = -1;
+      float bestDist = Float.MAX_VALUE;
+      for (int i = 0; i < centroids.size(); ++i) {
+        float currentDist = distance(point, centroids.get(i).getCenter());
+        if (currentDist < bestDist) {
+          bestDist = currentDist;
+          bestCentroid = i;
+        }
+      }
+
+      centroids.get(bestCentroid).addPoint(point);
+    }
+
+    int dims = centroids.get(0).getCenter().getPoint().length;
+    boolean isCenterChanged = false;
+    for (int i = 0; i < this.k; ++i) {
+      Clusterable newCenter = this.centroidOf(i, centroids.get(i), dims);
+      if (!isCenterChanged && !Arrays.equals(centroids.get(i).getCenter().getPoint(), newCenter.getPoint())) {
+        isCenterChanged = true;
+      }
+      centroids.get(i).setCenter(newCenter);
+    }
+
+    return isCenterChanged;
+  }
+
+  private Clusterable centroidOf(int docId, final Centroid<T> points, int dimension) {
+    final float[] centroid = new float[dimension];
+    points.getPoints().forEach(p -> {
+      final float[] point = p.getPoint();
       for (int i = 0; i < centroid.length; ++i) {
         centroid[i] += point[i];
       }
-    }
+    });
 
     for (int i = 0; i < centroid.length; ++i) {
-      centroid[i] /= (float) points.size();
+      centroid[i] /= (float) points.getPoints().size();
     }
 
     return new ImmutableClusterableVector(docId, centroid);
