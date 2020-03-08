@@ -165,7 +165,7 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
   }
 
   private boolean clustering(final Collection<T> points, final List<Centroid<T>> centroids) {
-    for (T point : points) {
+    for (final T point : points) {
       int bestCentroid = -1;
       float bestDist = Float.MAX_VALUE;
       for (int i = 0; i < centroids.size(); ++i) {
@@ -201,8 +201,9 @@ public class KMeansCluster<T extends Clusterable> implements Clusterer<T> {
       }
     });
 
+    float pointSize = (float) points.getPoints().size();
     for (int i = 0; i < centroid.length; ++i) {
-      centroid[i] /= (float) points.getPoints().size();
+      centroid[i] /= pointSize;
     }
 
     return new ImmutableClusterableVector(docId, centroid);

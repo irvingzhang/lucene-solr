@@ -98,18 +98,18 @@ public class IvfFlatIndex implements Accountable {
     SortedImmutableVectorValue results = new SortedImmutableVectorValue(ef, query, this.distanceMeasure);
 
     /// Phase two -> search topK center points from top centroids and their clusters
-    searchNearestPoint(query, vectorValues, expectedClusters, results, () -> false);
+    searchNearestPoints(query, vectorValues, expectedClusters, results, () -> false);
 
     /// Phase three -> search from candidate clusters to ensure sufficient results
     if (results.size() < ef) {
-      searchNearestPoint(query, vectorValues, candidateClusters, results, () -> results.size() >= ef);
+      searchNearestPoints(query, vectorValues, candidateClusters, results, () -> results.size() >= ef);
     }
 
     return results;
   }
 
-  private void searchNearestPoint(float[] query, VectorValues vectorValues, List<ImmutableUnClusterableVector> clusters,
-                                  SortedImmutableVectorValue results, BooleanSupplier supplier) throws IOException {
+  private void searchNearestPoints(float[] query, VectorValues vectorValues, List<ImmutableUnClusterableVector> clusters,
+                                   SortedImmutableVectorValue results, BooleanSupplier supplier) throws IOException {
     for (ImmutableUnClusterableVector cluster : clusters) {
       final List<Integer> points = cluster.points();
       for (Integer point : points) {
