@@ -19,7 +19,9 @@ package org.apache.lucene.util.hnsw;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -45,6 +47,66 @@ public final class HNSWGraph implements Accountable {
   public HNSWGraph(VectorValues.DistanceFunction distFunc) {
     this.distFunc = distFunc;
     this.layers = new ArrayList<>();
+  }
+
+  Neighbor greedyUpdateNearest(final float[] query, Neighbor ep, int level, VectorValues vectorValues) throws IOException {
+    if (level >= layers.size()) {
+      throw new IllegalArgumentException("layer does not exist for the level: " + level);
+    }
+
+    final Layer layer = layers.get(level);
+    Neighbor nearestNeighbor = ep;
+    for (;;) {
+      Neighbor prevNearest = nearestNeighbor;
+      final Collection<Neighbor> friends = layer.getFriends(ep.docId());
+      for (Neighbor neighbor : friends) {
+        float qDist = distance(query, neighbor.docId(), vectorValues);
+        if (qDist < nearestNeighbor.distance()) {
+          nearestNeighbor = new ImmutableNeighbor(neighbor.docId(), qDist);
+        }
+      }
+
+      if (nearestNeighbor.docId() == prevNearest.docId()) {
+        return nearestNeighbor;
+      }
+    }
+  }
+
+  void addLinksStartingFrom(int docId, final float[] query, final FurthestNeighbors results, int ef,
+                            Neighbor ep, int level, VectorValues vectorValues, int mMax) throws IOException {
+    results.clear();
+    results.add(ep);
+
+    searchLayer(query, results, ef, level, vectorValues);
+
+    final Layer layer = layers.get(level);
+    assert layer != null;
+
+    Iterator<Neighbor> iterator;
+    if (results.size() > mMax) {
+      final TreeSet<Neighbor> neighbors = shrinkNeighbors(layer, results, mMax, vectorValues);
+      iterator = neighbors.iterator();
+    } else {
+      iterator = results.iterator();
+    }
+
+    while (iterator.hasNext()) {
+      final Neighbor neighbor = iterator.next();
+      layer.addLink(docId, neighbor.docId(), mMax, neighbor.distance(), this, vectorValues);
+      layer.addLink(neighbor.docId(), docId, mMax, neighbor.distance(), this, vectorValues);
+    }
+  }
+
+  private TreeSet<Neighbor> shrinkNeighbors(final Layer layer, final FurthestNeighbors results, int mMax,
+                                            VectorValues vectorValues) throws IOException {
+    assert results.size() > mMax;
+
+    final TreeSet<Neighbor> friends = new TreeSet<>();
+    while (results.size() > 0) { /// results are in descending order
+      friends.add(results.pop()); /// friends are now in ascending order
+    }
+
+    return layer.doShrink(friends, mMax, this, vectorValues);
   }
 
   /**
@@ -90,7 +152,7 @@ public final class HNSWGraph implements Accountable {
           }
           Neighbor n = new ImmutableNeighbor(e.docId(), dist);
           candidates.add(n);
-          results.insertWithOverflow(n);
+          results.add(n);
           f = results.top();
         }
       }
@@ -101,7 +163,7 @@ public final class HNSWGraph implements Accountable {
     return visited.size();
   }
 
-  public float distance(int doc1, int doc2, VectorValues vectorValues) throws IOException {
+  float distance(int doc1, int doc2, VectorValues vectorValues) throws IOException {
     final float[] docValue = getVectorValues(doc1, vectorValues);
     return distance(docValue, doc2, vectorValues);
   }
@@ -116,21 +178,6 @@ public final class HNSWGraph implements Accountable {
       throw new IllegalStateException("docId=" + docId + " has no vector value");
     }
     return vectorValues.vectorValue();
-  }
-
-
-  static NearestNeighbors pickNearestNeighbor(Neighbors queue) {
-    NearestNeighbors nearests = new NearestNeighbors(queue.size());
-    Set<Integer> addedDocs = new HashSet<>();
-    int ef = queue.size();
-    while (addedDocs.size() < ef && queue.size() > 0) {
-      Neighbor c = queue.pop();
-      if (!addedDocs.contains(c.docId())) {
-        nearests.add(c);
-        addedDocs.add(c.docId());
-      }
-    }
-    return nearests;
   }
 
   public void ensureLevel(int level) {
@@ -212,28 +259,6 @@ public final class HNSWGraph implements Accountable {
   }
 
   /**
-   * Connects two nodes; this is supposed to be called when indexing
-   */
-  public void connectNodes(int level, int node1, int node2, float dist, int maxConnections, VectorValues vectorValues) throws IOException {
-    if (frozen) {
-      throw new IllegalStateException("graph is already freezed!");
-    }
-    assert level >= 0;
-    assert node1 >= 0 && node2 >= 0;
-    assert node1 != node2;
-
-    Layer layer = layers.get(level);
-    if (layer == null) {
-      throw new IllegalArgumentException("layer does not exist for level: " + level);
-    }
-    layer.connectNodes(node1, node2, dist);
-    // ensure friends size <= maxConnections
-    if (maxConnections > 0) {
-      layer.shrink(node2, maxConnections, this, vectorValues);
-    }
-  }
-
-  /**
    * Connects two nodes; this is supposed to be called when searching
    */
   public void connectNodes(int level, int node1, int node2) {
@@ -252,7 +277,7 @@ public final class HNSWGraph implements Accountable {
   }
 
   public void finish() {
-    while (layers.isEmpty() == false && layers.get(layers.size() - 1).size() == 0) {
+    while (!layers.isEmpty() && layers.get(layers.size() - 1).size() == 0) {
       // remove empty top layers
       layers.remove(layers.size() - 1);
     }

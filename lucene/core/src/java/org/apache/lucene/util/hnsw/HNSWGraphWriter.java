@@ -20,9 +20,7 @@ package org.apache.lucene.util.hnsw;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Accountable;
@@ -112,11 +110,12 @@ public final class HNSWGraphWriter implements Accountable {
     Neighbor ep = new ImmutableNeighbor(enterPoint, distFromEp);
 
     int level = levelGenerator.randomLevel();
-    FurthestNeighbors results = new FurthestNeighbors(efConst, ep);
     // down to the level from the hnsw's top level
     for (int l = hnsw.topLevel(); l > level; l--) {
-      hnsw.searchLayer(value, results, 1, l, vectorValues);
+      ep = hnsw.greedyUpdateNearest(value, ep, l, vectorValues);
     }
+
+    final FurthestNeighbors results = new FurthestNeighbors(efConst, ep);
 
     // down to level 0 with placing the doc to each layer
     hnsw.ensureLevel(level);
@@ -126,22 +125,7 @@ public final class HNSWGraphWriter implements Accountable {
         continue;
       }
 
-      hnsw.searchLayer(value, results, efConst, l, vectorValues);
-      int maxConnections = l == 0 ? maxConn0 : maxConn;
-      while (results.size() > maxConnections) {
-        results.pop();
-      }
-      for (Neighbor n : results) {
-        hnsw.connectNodes(l, docId, n.docId(), n.distance(), maxConnections, vectorValues);
-      }
-
-      /// The entry point keeps unchanged in Fassi, and uses the nearest one for each iteration in nmslib.
-      /// TODO run faster if keeping ep unchanged, but more accurate if using the nearest neighbor.
-      /*results.clear();
-      results.add(ep);*/
-      while (results.size() > 1) {
-        results.pop();
-      }
+      hnsw.addLinksStartingFrom(docId, value, results, efConst, ep, l, vectorValues, l == 0 ? maxConn0 : maxConn);
     }
   }
 
@@ -176,7 +160,7 @@ public final class HNSWGraphWriter implements Accountable {
     }
 
     @Override
-    public float[] vectorValue() throws IOException {
+    public float[] vectorValue() {
       return value;
     }
 

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 
 import org.apache.lucene.index.VectorValues;
@@ -57,13 +58,10 @@ final class Layer implements Accountable {
     friendsMap.putIfAbsent(node, new TreeSet<>());
   }
 
-  void connectNodes(int node1, int node2, float distance) {
-    addNodeIfAbsent(node1);
-    addNodeIfAbsent(node2);
-    Neighbor neighbor1 = new ImmutableNeighbor(node2, distance);
-    friendsMap.get(node1).add(neighbor1);
-    Neighbor neighbor2 = new ImmutableNeighbor(node1, distance);
-    friendsMap.get(node2).add(neighbor2);
+  void connectNode(int src, int dest, float distance) {
+    addNodeIfAbsent(src);
+    Neighbor neighbor1 = new ImmutableNeighbor(dest, distance);
+    friendsMap.get(src).add(neighbor1);
   }
 
   void connectNodes(int node1, int node2) {
@@ -75,48 +73,49 @@ final class Layer implements Accountable {
     friendsMap.get(node2).add(neighbor2);
   }
 
-  void shrink(int node, int maxFriends, HNSWGraph graph, VectorValues vectorValues) throws IOException {
-    assert graph != null;
-    assert vectorValues != null;
+  TreeSet<Neighbor> doShrink(final TreeSet<Neighbor> results, int mMax,
+                             HNSWGraph graph, VectorValues vectorValues) throws IOException {
+    final TreeSet<Neighbor> friends = new TreeSet<>();
+    while (!results.isEmpty()) {
+      final Neighbor v1 = results.pollFirst();
+      float v1qDist = v1.distance();
 
-    TreeSet<Neighbor> friends = friendsMap.get(node);
-    if (friends == null) {
-      throw new IllegalArgumentException("node " + node + " does not exist at this layer: " + level);
-    }
+      boolean good = true;
+      for (final Neighbor v2 : friends) {
+        float v1v2Dist = graph.distance(v1.docId(), v2.docId(), vectorValues);
 
-    if (friends.size() > maxFriends) {
-      final TreeSet<Neighbor> newFriends = new TreeSet<>();
-      for (Neighbor n : friends) {
-        float dist = n.distance();
-
-        boolean good = true;
-        for (Neighbor neighbor : newFriends) {
-          float neighborDist = graph.distance(n.docId(), neighbor.docId(), vectorValues);
-          if (neighborDist < dist) {
-            good = false;
-            break;
-          }
-        }
-
-        if (good) {
-          newFriends.add(n);
-          if (newFriends.size() >= maxFriends) {
-            break;
-          }
+        if (v1v2Dist < v1qDist) {
+          good = false;
+          break;
         }
       }
 
-      friendsMap.put(node, newFriends);
+      if (good) {
+        friends.add(v1);
+        if (friends.size() >= mMax) {
+          break;
+        }
+      }
     }
+
+    return friends;
+  }
+
+  void addLink(int srcId, int destId, int mMax, float distance, HNSWGraph graph, VectorValues vectorValues) throws IOException {
+    /// connect from dest to src
+    connectNode(srcId, destId, distance);
+    final TreeSet<Neighbor> friends = friendsMap.get(srcId);
+    if (friends.size() <= mMax) {
+      return;
+    }
+
+    final TreeSet<Neighbor> newNeighbors = doShrink(friends, mMax, graph, vectorValues);
+    friendsMap.put(srcId, newNeighbors);
   }
 
   Collection<Neighbor> getFriends(int node) {
     Collection<Neighbor> friends = friendsMap.get(node);
-    if (friends != null) {
-      return friends;
-    } else {
-      return NO_FRIENDS;
-    }
+    return Objects.requireNonNullElse(friends, NO_FRIENDS);
   }
 
   int size() {
