@@ -55,19 +55,21 @@ public final class HNSWGraph implements Accountable {
     }
 
     final Layer layer = layers.get(level);
-    Neighbor nearestNeighbor = ep;
+    float nearestDist = ep.distance();
+    int nearestDocId = ep.docId();
     for (;;) {
-      Neighbor prevNearest = nearestNeighbor;
+      int prevNearestDocId = nearestDocId;
       final Collection<Neighbor> friends = layer.getFriends(ep.docId());
       for (Neighbor neighbor : friends) {
         float qDist = distance(query, neighbor.docId(), vectorValues);
-        if (qDist < nearestNeighbor.distance()) {
-          nearestNeighbor = new ImmutableNeighbor(neighbor.docId(), qDist);
+        if (qDist < nearestDist) {
+          nearestDist = qDist;
+          nearestDocId = neighbor.docId();
         }
       }
 
-      if (nearestNeighbor.docId() == prevNearest.docId()) {
-        return nearestNeighbor;
+      if (nearestDocId == prevNearestDocId) {
+        return new ImmutableNeighbor(nearestDocId, nearestDist);
       }
     }
   }
