@@ -132,7 +132,15 @@ public final class HNSWGraphWriter implements Accountable {
         results.pop();
       }
       for (Neighbor n : results) {
-        hnsw.connectNodes(l, docId, n.docId(), n.distance(), maxConnections);
+        hnsw.connectNodes(l, docId, n.docId(), n.distance(), maxConnections, vectorValues);
+      }
+
+      /// The entry point keeps unchanged in Fassi, and uses the nearest one for each iteration in nmslib.
+      /// TODO run faster if keeping ep unchanged, but more accurate if using the nearest neighbor.
+      /*results.clear();
+      results.add(ep);*/
+      while (results.size() > 1) {
+        results.pop();
       }
     }
   }

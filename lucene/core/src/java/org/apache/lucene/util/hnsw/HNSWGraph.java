@@ -19,7 +19,6 @@ package org.apache.lucene.util.hnsw;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,10 +49,11 @@ public final class HNSWGraph implements Accountable {
 
   /**
    * Searches the nearest neighbors for a specified query at a level.
-   * @param query search query vector
-   * @param results on entry, has enter points to this level. On exit, the nearest neighbors in this level
-   * @param ef the number of nodes to be searched
-   * @param level graph level
+   *
+   * @param query        search query vector
+   * @param results      on entry, has enter points to this level. On exit, the nearest neighbors in this level
+   * @param ef           the number of nodes to be searched
+   * @param level        graph level
    * @param vectorValues vector values
    * @return number of candidates visited
    */
@@ -73,8 +73,8 @@ public final class HNSWGraph implements Accountable {
     Neighbor f = results.top();
     while (candidates.size() > 0) {
       Neighbor c = candidates.pollFirst();
-      assert c.isDeferred() == false;
-      assert f.isDeferred() == false;
+      assert !c.isDeferred();
+      assert !f.isDeferred();
       if (c.distance() > f.distance() && results.size() >= ef) {
         break;
       }
@@ -85,6 +85,9 @@ public final class HNSWGraph implements Accountable {
         visited.add(e.docId());
         float dist = distance(query, e.docId(), vectorValues);
         if (dist < f.distance() || results.size() < ef) {
+          if (results.size() == ef) {
+            results.pop();
+          }
           Neighbor n = new ImmutableNeighbor(e.docId(), dist);
           candidates.add(n);
           results.insertWithOverflow(n);
@@ -98,13 +101,23 @@ public final class HNSWGraph implements Accountable {
     return visited.size();
   }
 
+  public float distance(int doc1, int doc2, VectorValues vectorValues) throws IOException {
+    final float[] docValue = getVectorValues(doc1, vectorValues);
+    return distance(docValue, doc2, vectorValues);
+  }
+
   private float distance(float[] query, int docId, VectorValues vectorValues) throws IOException {
-      if (!vectorValues.seek(docId)) {
-        throw new IllegalStateException("docId=" + docId + " has no vector value");
-      }
-    float[] other = vectorValues.vectorValue();
+    final float[] other = getVectorValues(docId, vectorValues);
     return VectorValues.distance(query, other, distFunc);
   }
+
+  private float[] getVectorValues(int docId, VectorValues vectorValues) throws IOException {
+    if (!vectorValues.seek(docId)) {
+      throw new IllegalStateException("docId=" + docId + " has no vector value");
+    }
+    return vectorValues.vectorValue();
+  }
+
 
   static NearestNeighbors pickNearestNeighbor(Neighbors queue) {
     NearestNeighbors nearests = new NearestNeighbors(queue.size());
@@ -198,8 +211,10 @@ public final class HNSWGraph implements Accountable {
     layer.addNodeIfAbsent(node);
   }
 
-  /** Connects two nodes; this is supposed to be called when indexing */
-  public void connectNodes(int level, int node1, int node2, float dist, int maxConnections) {
+  /**
+   * Connects two nodes; this is supposed to be called when indexing
+   */
+  public void connectNodes(int level, int node1, int node2, float dist, int maxConnections, VectorValues vectorValues) throws IOException {
     if (frozen) {
       throw new IllegalStateException("graph is already freezed!");
     }
@@ -214,11 +229,13 @@ public final class HNSWGraph implements Accountable {
     layer.connectNodes(node1, node2, dist);
     // ensure friends size <= maxConnections
     if (maxConnections > 0) {
-      layer.shrink(node2, maxConnections);
+      layer.shrink(node2, maxConnections, this, vectorValues);
     }
   }
 
-  /** Connects two nodes; this is supposed to be called when searching */
+  /**
+   * Connects two nodes; this is supposed to be called when searching
+   */
   public void connectNodes(int level, int node1, int node2) {
     if (frozen) {
       throw new IllegalStateException("graph is already freezed!");

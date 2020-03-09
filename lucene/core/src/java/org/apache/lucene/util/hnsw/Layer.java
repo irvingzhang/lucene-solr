@@ -17,15 +17,16 @@
 
 package org.apache.lucene.util.hnsw;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
+import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
 
@@ -74,22 +75,37 @@ final class Layer implements Accountable {
     friendsMap.get(node2).add(neighbor2);
   }
 
-  void shrink(int node, int maxFriends) {
+  void shrink(int node, int maxFriends, HNSWGraph graph, VectorValues vectorValues) throws IOException {
+    assert graph != null;
+    assert vectorValues != null;
+
     TreeSet<Neighbor> friends = friendsMap.get(node);
     if (friends == null) {
       throw new IllegalArgumentException("node " + node + " does not exist at this layer: " + level);
     }
+
     if (friends.size() > maxFriends) {
-      TreeSet<Neighbor> newFriends = new TreeSet<>();
-      Iterator<Neighbor> itr = friends.iterator();
-      while(itr.hasNext()) {
-        Neighbor n = itr.next();
-        if (newFriends.size() < maxFriends || friendsMap.get(n.docId()).size() == 1) {
+      final TreeSet<Neighbor> newFriends = new TreeSet<>();
+      for (Neighbor n : friends) {
+        float dist = n.distance();
+
+        boolean good = true;
+        for (Neighbor neighbor : newFriends) {
+          float neighborDist = graph.distance(n.docId(), neighbor.docId(), vectorValues);
+          if (neighborDist < dist) {
+            good = false;
+            break;
+          }
+        }
+
+        if (good) {
           newFriends.add(n);
-        } else {
-          friendsMap.get(n.docId()).removeIf(n2 -> n2.docId() == node);
+          if (newFriends.size() >= maxFriends) {
+            break;
+          }
         }
       }
+
       friendsMap.put(node, newFriends);
     }
   }
