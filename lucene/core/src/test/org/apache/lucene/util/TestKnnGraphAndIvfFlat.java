@@ -60,18 +60,18 @@ public class TestKnnGraphAndIvfFlat extends LuceneTestCase {
   }
 
   public void testComparison() throws Exception {
-    int numDocs = 50000, dimension = 100;
+    int numDocs = 5000, dimension = 100;
 
     float[][] randomVectors = KnnTestHelper.randomVectors(numDocs, dimension);
 
-    final List<float[]> queryVects = Arrays.asList(randomVectors).subList(0, 10000);
+    final List<float[]> queryVects = Arrays.asList(randomVectors).subList(0, 1000);
 
     final List<int[]> truthIndex = new ArrayList<>(queryVects.size());
     for (int i = 0; i < queryVects.size(); ++i) {
       truthIndex.add(new int[] {i});
     }
 
-    runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT, null, queryVects, truthIndex, 1);
+    ///runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.IVFFLAT, null, queryVects, truthIndex, 1);
 
     runCase(numDocs, dimension, randomVectors, VectorValues.VectorIndexType.HNSW, null, queryVects, truthIndex, 1);
   }

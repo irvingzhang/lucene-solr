@@ -172,6 +172,15 @@ public final class HNSWGraph implements Accountable {
     return visited.size();
   }
 
+  public float distance(int srcId, int targetId, VectorValues vectorValues) throws IOException {
+    if (!vectorValues.seek(srcId)) {
+      throw new IllegalStateException("docId=" + srcId + " has no vector value");
+    }
+    float[] srcVec = vectorValues.vectorValue();
+
+    return distance(srcVec, targetId, vectorValues);
+  }
+
   private float distance(float[] query, int docId, VectorValues vectorValues) throws IOException {
       if (!vectorValues.seek(docId)) {
         throw new IllegalStateException("docId=" + docId + " has no vector value");
@@ -274,7 +283,7 @@ public final class HNSWGraph implements Accountable {
   }
 
   /** Connects two nodes; this is supposed to be called when indexing */
-  public void connectNodes(int level, int node1, int node2, float dist, int maxConnections) {
+  public void connectNodes(int level, int node1, int node2, float dist, int maxConnections, VectorValues vectorValues) throws IOException {
     if (frozen) {
       throw new IllegalStateException("graph is already freezed!");
     }
@@ -289,7 +298,24 @@ public final class HNSWGraph implements Accountable {
     layer.connectNodes(node1, node2, dist);
     // ensure friends size <= maxConnections
     if (maxConnections > 0) {
-      layer.shrink(node2, maxConnections);
+      layer.shrink(node2, maxConnections, this, vectorValues);
+    }
+  }
+
+  public void shrinkNodes(int level, int node, int maxConns) throws IOException {
+    if (frozen) {
+      throw new IllegalStateException("graph is already freezed!");
+    }
+    assert level >= 0;
+    assert node >= 0;
+
+    Layer layer = layers.get(level);
+    if (layer == null) {
+      throw new IllegalArgumentException("layer does not exist for level: " + level);
+    }
+    // ensure friends size <= maxConnections
+    if (maxConns > 0) {
+      layer.shrink(node, maxConns, this,null);
     }
   }
 
@@ -307,6 +333,21 @@ public final class HNSWGraph implements Accountable {
       throw new IllegalArgumentException("layer does not exist for level: " + level);
     }
     layer.connectNodes(node1, node2);
+  }
+
+  public void connectNodes(int level, int node1, int node2, float dist) {
+    if (frozen) {
+      throw new IllegalStateException("graph is already freezed!");
+    }
+    assert level >= 0;
+    assert node1 >= 0 && node2 >= 0;
+    assert node1 != node2;
+
+    Layer layer = layers.get(level);
+    if (layer == null) {
+      throw new IllegalArgumentException("layer does not exist for level: " + level);
+    }
+    layer.connectNodes(node1, node2, dist);
   }
 
   public void finish() {

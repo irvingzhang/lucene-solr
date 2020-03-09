@@ -77,10 +77,10 @@ public class KnnIvfAndGraphPerformTester extends LuceneTestCase {
 
   private static void evaluateRecallRatio(final List<float[]> siftDataset, final List<float[]> queryDataset, final List<int[]> groundTruthVects) {
     boolean success = false;
-    while (!success) {
+    /*while (!success) {
       success = runCase(siftDataset.size(), siftDataset.get(0).length,
           siftDataset, VectorValues.VectorIndexType.IVFFLAT, IVFFLAT_INDEX_DIR, queryDataset, groundTruthVects, new int[]{8, 16, 32, 64, 128, 256});
-    }
+    }*/
 
     success = false;
     while (!success) {

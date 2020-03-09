@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -128,11 +129,18 @@ public final class HNSWGraphWriter implements Accountable {
 
       hnsw.searchLayer(value, results, efConst, l, vectorValues);
       int maxConnections = l == 0 ? maxConn0 : maxConn;
+
       while (results.size() > maxConnections) {
         results.pop();
       }
+
       for (Neighbor n : results) {
-        hnsw.connectNodes(l, docId, n.docId(), n.distance(), maxConnections);
+        hnsw.connectNodes(l, docId, n.docId(), n.distance(), maxConnections, vectorValues);
+      }
+
+      /// The entry point keeps unchanged in Fassi, select the nearest one for each iteration in nmslib.
+      while (results.size() > 1) {
+        results.pop();
       }
     }
   }

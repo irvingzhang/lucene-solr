@@ -17,6 +17,7 @@
 
 package org.apache.lucene.util.hnsw;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,8 +25,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 
+import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.Accountable;
 import org.apache.lucene.util.RamUsageEstimator;
 
@@ -74,16 +77,42 @@ final class Layer implements Accountable {
     friendsMap.get(node2).add(neighbor2);
   }
 
-  void shrink(int node, int maxFriends) {
+  void shrink(int node, int maxFriends, HNSWGraph hnsw, VectorValues vectorValues) throws IOException {
+    assert vectorValues != null;
+
     TreeSet<Neighbor> friends = friendsMap.get(node);
     if (friends == null) {
       throw new IllegalArgumentException("node " + node + " does not exist at this layer: " + level);
     }
+
     if (friends.size() > maxFriends) {
       TreeSet<Neighbor> newFriends = new TreeSet<>();
-      Iterator<Neighbor> itr = friends.iterator();
-      while(itr.hasNext()) {
-        Neighbor n = itr.next();
+      for (Neighbor n : friends) {
+        float dist = n.distance();
+
+        boolean good = true;
+        for (Neighbor neighbor : newFriends) {
+          float newDist = hnsw.distance(n.docId(), neighbor.docId(), vectorValues);
+          if (newDist < dist) {
+            good = false;
+            break;
+          }
+        }
+
+        if (good) {
+          newFriends.add(n);
+          if (newFriends.size() >= maxFriends) {
+            break;
+          }
+        }
+      }
+
+      friendsMap.put(node, newFriends);
+    }
+
+    /*if (friends.size() > maxFriends) {
+      TreeSet<Neighbor> newFriends = new TreeSet<>();
+      for (Neighbor n : friends) {
         if (newFriends.size() < maxFriends || friendsMap.get(n.docId()).size() == 1) {
           newFriends.add(n);
         } else {
@@ -91,16 +120,12 @@ final class Layer implements Accountable {
         }
       }
       friendsMap.put(node, newFriends);
-    }
+    }*/
   }
 
   Collection<Neighbor> getFriends(int node) {
     Collection<Neighbor> friends = friendsMap.get(node);
-    if (friends != null) {
-      return friends;
-    } else {
-      return NO_FRIENDS;
-    }
+    return Objects.requireNonNullElse(friends, NO_FRIENDS);
   }
 
   int size() {

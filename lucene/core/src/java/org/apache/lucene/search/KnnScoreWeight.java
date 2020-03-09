@@ -71,7 +71,7 @@ class KnnScoreWeight extends ConstantScoreWeight {
     return new ScorerSupplier() {
       @Override
       public Scorer get(long leadCost) throws IOException {
-        Neighbors neighbors = hnswReader.searchNeighborsV2( queryVector, ef, vectorValues);
+        Neighbors neighbors = hnswReader.searchNeighbors( queryVector, ef, vectorValues);
         visitedCounter.addAndGet(hnswReader.getVisitedCount());
         return new Scorer(weight) {
 
