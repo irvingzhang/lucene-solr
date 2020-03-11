@@ -64,7 +64,7 @@ public final class HNSWGraphReader {
     }
 
     final FurthestNeighbors neighbors = new FurthestNeighbors(ef, ep);
-    visitedCount += hnsw.searchLayer(query, neighbors, ef, 0, vectorValues);
+    visitedCount += hnsw.searchLayer(query, neighbors, ef, 0, vectorValues, true);
     return neighbors;
   }
 

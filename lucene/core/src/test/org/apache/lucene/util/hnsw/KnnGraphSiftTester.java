@@ -105,7 +105,6 @@ public class KnnGraphSiftTester {
         dir, new IndexWriterConfig(new StandardAnalyzer()).setSimilarity(new AssertingSimilarity(new RandomSimilarity(new Random())))
         .setMaxBufferedDocs(1500000).setRAMBufferSizeMB(4096).setMergeScheduler(new SerialMergeScheduler()).setUseCompoundFile(false)
         .setReaderPooling(false).setCodec(Codec.forName("Lucene90")))) {
-      long totalIndexTime = 0, commitTime = 0, forceMergeTime = 0;
       long addStartTime = System.currentTimeMillis();
       for (int i = 0; i < numDoc; ++i) {
         KnnTestHelper.add(iw, i, randomVectors.get(i));

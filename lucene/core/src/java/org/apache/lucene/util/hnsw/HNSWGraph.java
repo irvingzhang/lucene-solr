@@ -57,7 +57,7 @@ public final class HNSWGraph implements Accountable {
     final Layer layer = layers.get(level);
     float nearestDist = ep.distance();
     int nearestDocId = ep.docId();
-    for (;;) {
+    for (; ; ) {
       int prevNearestDocId = nearestDocId;
       final Collection<Neighbor> friends = layer.getFriends(ep.docId());
       for (Neighbor neighbor : friends) {
@@ -79,7 +79,7 @@ public final class HNSWGraph implements Accountable {
     results.clear();
     results.add(ep);
 
-    searchLayer(query, results, ef, level, vectorValues);
+    searchLayer(query, results, ef, level, vectorValues, false);
 
     final Layer layer = layers.get(level);
     assert layer != null;
@@ -121,7 +121,7 @@ public final class HNSWGraph implements Accountable {
    * @param vectorValues vector values
    * @return number of candidates visited
    */
-  int searchLayer(float[] query, FurthestNeighbors results, int ef, int level, VectorValues vectorValues) throws IOException {
+  int searchLayer(float[] query, FurthestNeighbors results, int ef, int level, VectorValues vectorValues, boolean ensureResultSize) throws IOException {
     if (level >= layers.size()) {
       throw new IllegalArgumentException("layer does not exist for the level: " + level);
     }
@@ -139,8 +139,16 @@ public final class HNSWGraph implements Accountable {
       Neighbor c = candidates.pollFirst();
       assert !c.isDeferred();
       assert !f.isDeferred();
-      if (c.distance() > f.distance() && results.size() >= ef) {
-        break;
+      if (c.distance() > f.distance()) {
+        /// for insertion
+        if (!ensureResultSize) {
+          break;
+        }
+
+        /// for search
+        if (results.size() >= ef) {
+          break;
+        }
       }
       for (Neighbor e : layer.getFriends(c.docId())) {
         if (visited.contains(e.docId())) {
